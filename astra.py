@@ -31,14 +31,16 @@ class AstraSplit:
 
     # ── random generation ──────────────────────────────────────────────────────
 
-    def generate_uniform_randoms(self, positions, boxsize, n_factor=1, seed=None):
+    def generate_uniform_randoms(self, positions, n_factor=1, seed=None):
         """
-        Draw uniform randoms inside a box centred at the origin.
+        Draw uniform randoms spanning the same bounding box as positions.
+
+        Bounds are derived from the per-axis min/max of the input, so this
+        works for any geometry (cubic, rectangular, offset, non-centred).
 
         Parameters
         ----------
         positions : (N, 3) array
-        boxsize   : (3,) array  — side lengths in Mpc/h
         n_factor  : int         — randoms = n_factor × len(positions)
         seed      : int or None
 
@@ -46,10 +48,11 @@ class AstraSplit:
         -------
         random_positions : (n_factor*N, 3) array
         """
-        boxsize = np.asarray(boxsize)
-        n_rand  = n_factor * len(positions)
-        rng     = np.random.default_rng(seed)
-        return rng.uniform(low=-boxsize / 2, high=boxsize / 2, size=(n_rand, 3))
+        lo     = positions.min(axis=0)
+        hi     = positions.max(axis=0)
+        n_rand = n_factor * len(positions)
+        rng    = np.random.default_rng(seed)
+        return rng.uniform(low=lo, high=hi, size=(n_rand, 3))
 
     # ── dataframe builder ──────────────────────────────────────────────────────
 

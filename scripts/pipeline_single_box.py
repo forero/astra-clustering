@@ -82,7 +82,7 @@ print(f'  Subbox ({BOXSIZE:.0f} Mpc/h): {len(positions):,} galaxies')
 print('\nGenerating ASTRA randoms ...')
 astra = AstraSplit()
 rand_positions = astra.generate_uniform_randoms(
-    positions, boxsize, n_factor=N_RAND, seed=SEED,
+    positions, n_factor=N_RAND, seed=SEED,
 )
 print(f'  {len(rand_positions):,} randoms  (factor={N_RAND}×)')
 
@@ -118,9 +118,9 @@ for q in range(1, N_Q + 1):
 # must NOT be used.  Instead we pass explicit uniform randoms so pycorr
 # computes (DD − 2DR + RR) / RR.
 print('\nGenerating geometry randoms for 2PCF ...')
-rng_geom    = np.random.default_rng(SEED + 1)
+rng_geom     = np.random.default_rng(SEED + 1)
 geom_randoms = rng_geom.uniform(
-    low=-boxsize / 2, high=boxsize / 2,
+    low=positions.min(axis=0), high=positions.max(axis=0),
     size=(N_RAND_GEOM * len(positions), 3),
 )
 print(f'  {len(geom_randoms):,} geometry randoms  (factor={N_RAND_GEOM}×)')
