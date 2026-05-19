@@ -46,12 +46,12 @@ LOS                = 'z'
 N_Q                = 4       # number of ASTRA quantiles
 N_RAND             = 1       # ASTRA randoms: N_RAND × n_data
 N_RAND_GEOM        = 5       # geometry randoms factor (for LS estimator)
-N_ASTRA_ITERATIONS = 10      # number of independent ASTRA random realisations
+N_ASTRA_ITERATIONS = 30      # number of independent ASTRA random realisations
 SEED               = 42      # ASTRA iteration i uses seed SEED+i
 SEED_GEOM          = SEED + 1000   # well-separated from iteration seeds
 NTHREADS           = 8
 
-S_EDGES  = np.linspace(0, 150, 31)   # 30 bins, 0–150 Mpc/h
+S_EDGES  = np.linspace(0, 150, 16)   # 15 bins, 0–150 Mpc/h
 MU_EDGES = np.linspace(-1, 1, 241)
 
 OUT_DIR.mkdir(parents=True, exist_ok=True)

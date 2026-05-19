@@ -158,8 +158,8 @@ quantiles cluster just as overdense galaxies do.
 | `N_Q` | 4 | Number of ASTRA quantiles |
 | `N_RAND` | 1 | ASTRA randoms factor |
 | `N_RAND_GEOM` | 5 | Geometry randoms factor |
-| `N_ASTRA_ITERATIONS` | 10 | Number of independent ASTRA random realisations |
+| `N_ASTRA_ITERATIONS` | 30 | Number of independent ASTRA random realisations |
 | `SEED` | 42 | Base RNG seed; iteration i uses `SEED+i` for ASTRA randoms |
 | `SEED_GEOM` | 1042 | Geometry randoms seed (fixed, `SEED+1000`) |
 | `NTHREADS` | 8 | CPU threads for pycorr / corrfunc |
-| `S_EDGES` | 0–150 Mpc/h, 30 bins | 2PCF s binning |
+| `S_EDGES` | 0–150 Mpc/h, 15 bins | 2PCF s binning |
