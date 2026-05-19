@@ -33,7 +33,7 @@ Q4 = most overdense).  The same bin edges are applied to the randoms.
 astra-clustering/
 ├── astra.py          ← ASTRA algorithm module
 ├── scripts/
-│   ├── pipeline.py   ← end-to-end pipeline (load → classify → split → 2PCF)
+│   ├── pipeline_single_box.py   ← end-to-end pipeline (load → classify → split → 2PCF)
 │   └── plot.py       ← produces 6 figures
 ├── data/             ← pipeline output (.npy / .npz files)
 ├── plots/            ← figure output (.png files)
@@ -74,13 +74,13 @@ unset PYTHONPATH
 source /global/common/software/desi/users/adematti/cosmodesi_environment.sh main
 
 cd /pscratch/sd/f/forero/astra-clustering
-srun -n 1 -c 8 python scripts/pipeline.py
+srun -n 1 -c 8 python scripts/pipeline_single_box.py
 python scripts/plot.py        # no srun needed — lightweight
 ```
 
 ---
 
-## Pipeline steps (`pipeline.py`)
+## Pipeline steps (`pipeline_single_box.py`)
 
 1. **Load** `c000_ph000/seed0/hod000.fits` from the EMC HOD catalog  
    Path: `/pscratch/sd/n/ntbfin/emulator/hods/z0.5/yuan23_prior/`
@@ -146,7 +146,7 @@ quantiles cluster just as overdense galaxies do.
 
 ---
 
-## Key parameters (top of `pipeline.py`)
+## Key parameters (top of `pipeline_single_box.py`)
 
 | Parameter | Default | Meaning |
 |-----------|---------|---------|

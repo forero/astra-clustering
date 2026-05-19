@@ -19,7 +19,7 @@ Usage
   unset PYTHONPATH
   source /global/common/software/desi/users/adematti/cosmodesi_environment.sh main
   cd /pscratch/sd/f/forero/astra-clustering
-  srun -n 1 -c 8 python scripts/pipeline.py
+  srun -n 1 -c 8 python scripts/pipeline_single_box.py
 """
 
 import sys
