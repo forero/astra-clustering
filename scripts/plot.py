@@ -22,12 +22,15 @@ COLORS = ['#e41a1c', '#ff7f00', '#4daf4a', '#377eb8']  # Q1=voids → Q4=knots
 LABELS = [f'Q{q}' for q in range(1, N_Q + 1)]
 
 # ── load multipoles ────────────────────────────────────────────────────────────
-data_q, rand_q = [], []
-for q in range(1, N_Q + 1):
-    d = np.load(DATA_DIR / f'multipoles_tpcf_data_q{q}.npz')
-    data_q.append({'s': d['s'], 'xi0': d['xi0'], 'xi2': d['xi2']})
-    r = np.load(DATA_DIR / f'multipoles_tpcf_rand_q{q}.npz')
-    rand_q.append({'s': r['s'], 'xi0': r['xi0'], 'xi2': r['xi2']})
+def load(stem):
+    d = np.load(DATA_DIR / f'multipoles_{stem}.npz')
+    return {'s': d['s'], 'xi0': d['xi0'], 'xi2': d['xi2']}
+
+data_q       = [load(f'tpcf_data_q{q}')             for q in range(1, N_Q + 1)]
+rand_q       = [load(f'tpcf_rand_q{q}')             for q in range(1, N_Q + 1)]
+cross_data_q = [load(f'tpcf_cross_full_data_q{q}')  for q in range(1, N_Q + 1)]
+cross_rand_q = [load(f'tpcf_cross_full_rand_q{q}')  for q in range(1, N_Q + 1)]
+full         =  load('tpcf_full_data')
 
 
 def savefig(fig, name):
@@ -121,5 +124,52 @@ for idx, ax in enumerate(axes.flat):
 fig.suptitle('Data vs ASTRA-random monopole per quantile', y=1.01)
 fig.tight_layout()
 savefig(fig, 'data_vs_rand_monopole.png')
+
+# ── Figure 7: full data auto-correlation ─────────────────────────────────────
+fig, axes = plt.subplots(1, 2, figsize=(12, 5))
+s = full['s']
+axes[0].plot(s, s**2 * full['xi0'], color='k', lw=2)
+axes[1].plot(s, s**2 * full['xi2'], color='k', lw=2)
+for ax, title, ell in zip(axes, ['Monopole', 'Quadrupole'], [0, 2]):
+    ax.axhline(0, color='k', lw=0.8, ls='--')
+    ax.set_xlabel(r'$s\ [h^{-1}\,\mathrm{Mpc}]$')
+    ax.set_ylabel(rf'$s^2\,\xi_{ell}(s)\ [h^{{-2}}\,\mathrm{{Mpc}}^2]$')
+    ax.set_title(f'Full data {title}')
+    ax.set_xlim(0, 150)
+fig.suptitle('Full data auto-correlation  —  500 Mpc/h subbox, los=z', y=1.01)
+fig.tight_layout()
+savefig(fig, 'full_data_autocorr.png')
+
+# ── Figure 8: cross-correlation full data × data quantiles ───────────────────
+fig, axes = plt.subplots(1, 2, figsize=(12, 5))
+for d, label, color in zip(cross_data_q, LABELS, COLORS):
+    axes[0].plot(d['s'], d['s']**2 * d['xi0'], color=color, lw=2, label=label)
+    axes[1].plot(d['s'], d['s']**2 * d['xi2'], color=color, lw=2, label=label)
+for ax, title, ell in zip(axes, ['Monopole', 'Quadrupole'], [0, 2]):
+    ax.axhline(0, color='k', lw=0.8, ls='--')
+    ax.set_xlabel(r'$s\ [h^{-1}\,\mathrm{Mpc}]$')
+    ax.set_ylabel(rf'$s^2\,\xi_{ell}(s)\ [h^{{-2}}\,\mathrm{{Mpc}}^2]$')
+    ax.set_title(f'Full data × data quantile {title}')
+    ax.set_xlim(0, 150)
+    ax.legend(title='Q1=underdense → Q4=overdense', fontsize=8)
+fig.suptitle('Cross-correlation: full data × ASTRA data quantiles', y=1.01)
+fig.tight_layout()
+savefig(fig, 'cross_full_data_quantiles.png')
+
+# ── Figure 9: cross-correlation full data × random quantiles ─────────────────
+fig, axes = plt.subplots(1, 2, figsize=(12, 5))
+for r, label, color in zip(cross_rand_q, LABELS, COLORS):
+    axes[0].plot(r['s'], r['s']**2 * r['xi0'], color=color, lw=2, label=label)
+    axes[1].plot(r['s'], r['s']**2 * r['xi2'], color=color, lw=2, label=label)
+for ax, title, ell in zip(axes, ['Monopole', 'Quadrupole'], [0, 2]):
+    ax.axhline(0, color='k', lw=0.8, ls='--')
+    ax.set_xlabel(r'$s\ [h^{-1}\,\mathrm{Mpc}]$')
+    ax.set_ylabel(rf'$s^2\,\xi_{ell}(s)\ [h^{{-2}}\,\mathrm{{Mpc}}^2]$')
+    ax.set_title(f'Full data × random quantile {title}')
+    ax.set_xlim(0, 150)
+    ax.legend(title='Q1=underdense → Q4=overdense', fontsize=8)
+fig.suptitle('Cross-correlation: full data × ASTRA random quantiles', y=1.01)
+fig.tight_layout()
+savefig(fig, 'cross_full_rand_quantiles.png')
 
 print('Done.')

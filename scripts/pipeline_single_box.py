@@ -128,11 +128,17 @@ print(f'  {len(geom_randoms):,} geometry randoms  (factor={N_RAND_GEOM}×)')
 # ── 7. Compute 2PCF per quantile ──────────────────────────────────────────────
 edges = (S_EDGES, MU_EDGES)
 
-def compute_and_save_tpcf(pos_in, label, out_stem):
-    print(f'  {label} ({len(pos_in):,}) ...')
-    xi = TwoPointCorrelationFunction(
-        'smu',
-        edges=edges,
+def compute_and_save_tpcf(pos_in, label, out_stem, pos2=None):
+    """Auto- or cross-correlation using the Landy-Szalay estimator.
+
+    If pos2 is None: auto-correlation of pos_in.
+    If pos2 is given: cross-correlation between pos_in and pos2.
+    The same geometry randoms are used for both samples.
+    """
+    desc = f'{label} ({len(pos_in):,}'
+    desc += f' × {len(pos2):,})' if pos2 is not None else ')'
+    print(f'  {desc} ...')
+    kwargs = dict(
         data_positions1=pos_in,
         randoms_positions1=geom_randoms,
         engine='corrfunc',
@@ -141,12 +147,17 @@ def compute_and_save_tpcf(pos_in, label, out_stem):
         position_type='pos',
         los=LOS,
     )
+    if pos2 is not None:
+        kwargs['data_positions2'] = pos2
+        kwargs['randoms_positions2'] = geom_randoms
+    xi = TwoPointCorrelationFunction('smu', edges=edges, **kwargs)
     xi.save(str(OUT_DIR / f'{out_stem}.npy'))
     s, multipoles = xi(ells=(0, 2), return_sep=True)
     xi0, xi2 = multipoles[0], multipoles[1]
     np.savez(OUT_DIR / f'multipoles_{out_stem}.npz', s=s, xi0=xi0, xi2=xi2)
     print(f'    xi0[15]={xi0[15]:.4f}  xi2[15]={xi2[15]:.4f}')
 
+# per-quantile auto-correlations
 print('\nComputing 2PCF for data quantiles ...')
 for q in range(1, N_Q + 1):
     pos_q = np.load(OUT_DIR / f'data_quantile_q{q}.npy')
@@ -156,6 +167,25 @@ print('\nComputing 2PCF for random quantiles ...')
 for q in range(1, N_Q + 1):
     rand_q = np.load(OUT_DIR / f'rand_quantile_q{q}.npy')
     compute_and_save_tpcf(rand_q, f'randoms Q{q}', f'tpcf_rand_q{q}')
+
+# full-sample auto-correlation
+print('\nComputing 2PCF for full data sample ...')
+np.save(OUT_DIR / 'full_data.npy', positions)
+compute_and_save_tpcf(positions, 'full data', 'tpcf_full_data')
+
+# cross-correlations: full data × each data quantile
+print('\nComputing cross-correlation: full data × data quantiles ...')
+for q in range(1, N_Q + 1):
+    pos_q = np.load(OUT_DIR / f'data_quantile_q{q}.npy')
+    compute_and_save_tpcf(positions, f'full data × data Q{q}',
+                          f'tpcf_cross_full_data_q{q}', pos2=pos_q)
+
+# cross-correlations: full data × each random quantile
+print('\nComputing cross-correlation: full data × random quantiles ...')
+for q in range(1, N_Q + 1):
+    rand_q = np.load(OUT_DIR / f'rand_quantile_q{q}.npy')
+    compute_and_save_tpcf(positions, f'full data × randoms Q{q}',
+                          f'tpcf_cross_full_rand_q{q}', pos2=rand_q)
 
 print('\n=== Done ===')
 print(f'Output files in {OUT_DIR}:')

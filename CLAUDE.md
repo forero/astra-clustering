@@ -139,6 +139,9 @@ Output: `plots/` (inside the repo)
 | `rand_monopole_per_quantile.png` | s²ξ₀(s) for random Q1–Q4 |
 | `rand_quadrupole_per_quantile.png` | s²ξ₂(s) for random Q1–Q4 |
 | `data_vs_rand_monopole.png` | Data vs randoms monopole, 2×2 panel per quantile |
+| `full_data_autocorr.png` | Full sample auto-correlation monopole + quadrupole |
+| `cross_full_data_quantiles.png` | Cross-correlation full data × each data quantile |
+| `cross_full_rand_quantiles.png` | Cross-correlation full data × each random quantile |
 
 The random quantile 2PCF is non-trivial (not ≈ 0) because ASTRA randoms
 trace the same cosmic-web environments as the data — overdense random
