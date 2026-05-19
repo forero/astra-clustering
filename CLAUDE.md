@@ -102,8 +102,8 @@ python scripts/plot.py        # no srun needed — lightweight
    a. Generate new ASTRA randoms (`N_RAND=1×`, uniform, bounds from data min/max)  
    b. Build combined data+random dataframe  
    c. Run ASTRA: Delaunay → neighbour counts → `r` for every point  
-   d. Split into quantiles: bin edges from data `r` (`pd.qcut`); same edges
-      applied to randoms (`pd.cut`)  
+   d. Split into quantiles: data and randoms each split independently with
+      `pd.qcut` so both populations have equal counts per quantile  
    e. Compute 2PCF (ℓ=0, ℓ=2) for: data quantile autos, random quantile autos,
       full data × data quantile cross, full data × random quantile cross  
    f. Accumulate multipole arrays across iterations  

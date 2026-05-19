@@ -142,9 +142,9 @@ class AstraSplit:
         """
         Convert classification rows to a DataFrame with QUARTILE labels.
 
-        Bin edges are derived from the *data* r distribution (pd.qcut).
-        The same edges are applied to the *randoms* (pd.cut) so both
-        populations are split at identical density thresholds.
+        Data and randoms are each split independently with pd.qcut so
+        both populations have approximately equal counts per quantile.
+        Q1 = most underdense, Q{n_quantiles} = most overdense in each.
 
         Parameters
         ----------
@@ -170,29 +170,23 @@ class AstraSplit:
 
         data_mask = df['ISDATA_BOOL'] & df['r'].notna()
         rand_mask = ~df['ISDATA_BOOL'] & df['r'].notna()
+        labels    = list(range(1, n_quantiles + 1))
 
-        # Bin edges from data distribution
-        _, bin_edges = pd.qcut(
-            df.loc[data_mask, 'r'], n_quantiles,
-            retbins=True, duplicates='drop',
-        )
-        n_bins         = len(bin_edges) - 1
-        bin_edges[0]   = -np.inf
-        bin_edges[-1]  =  np.inf
-        labels         = list(range(1, n_bins + 1))
-
+        # Each population split independently so both have equal counts per quantile
         df['QUARTILE'] = np.nan
         df.loc[data_mask, 'QUARTILE'] = pd.qcut(
             df.loc[data_mask, 'r'], n_quantiles,
             labels=labels, duplicates='drop',
         ).astype(float)
 
-        df.loc[rand_mask, 'QUARTILE'] = pd.cut(
-            df.loc[rand_mask, 'r'],
-            bins=bin_edges, labels=labels, include_lowest=True,
+        df.loc[rand_mask, 'QUARTILE'] = pd.qcut(
+            df.loc[rand_mask, 'r'], n_quantiles,
+            labels=labels, duplicates='drop',
         ).astype(float)
 
         print('Quantile distribution (data):')
         print(df.loc[data_mask, 'QUARTILE'].value_counts().sort_index().to_string())
+        print('Quantile distribution (randoms):')
+        print(df.loc[rand_mask, 'QUARTILE'].value_counts().sort_index().to_string())
 
         return df
