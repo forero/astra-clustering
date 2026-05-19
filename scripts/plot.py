@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """
-Plot 2PCF results from pipeline.py.
+Plot 2PCF results from pipeline_single_box.py.
+
+Lines show the mean over N_ASTRA_ITERATIONS; shaded bands show ±1σ.
 
 Run from any node (no srun needed):
   python scripts/plot.py
@@ -24,13 +26,27 @@ LABELS = [f'Q{q}' for q in range(1, N_Q + 1)]
 # ── load multipoles ────────────────────────────────────────────────────────────
 def load(stem):
     d = np.load(DATA_DIR / f'multipoles_{stem}.npz')
-    return {'s': d['s'], 'xi0': d['xi0'], 'xi2': d['xi2']}
+    return {
+        's':       d['s'],
+        'xi0':     d['xi0'],     'xi0_std': d['xi0_std'],
+        'xi2':     d['xi2'],     'xi2_std': d['xi2_std'],
+    }
 
 data_q       = [load(f'tpcf_data_q{q}')             for q in range(1, N_Q + 1)]
 rand_q       = [load(f'tpcf_rand_q{q}')             for q in range(1, N_Q + 1)]
 cross_data_q = [load(f'tpcf_cross_full_data_q{q}')  for q in range(1, N_Q + 1)]
 cross_rand_q = [load(f'tpcf_cross_full_rand_q{q}')  for q in range(1, N_Q + 1)]
 full         =  load('tpcf_full_data')
+
+
+def band(ax, d, key, color, label=None, lw=2, ls='-', alpha=0.2):
+    """Plot mean line with ±1σ shaded band."""
+    s  = d['s']
+    y  = d[key]
+    ye = d[key + '_std']
+    ax.plot(s, s**2 * y, color=color, lw=lw, ls=ls, label=label)
+    ax.fill_between(s, s**2 * (y - ye), s**2 * (y + ye),
+                    color=color, alpha=alpha)
 
 
 def savefig(fig, name):
@@ -43,7 +59,7 @@ def savefig(fig, name):
 # ── Figure 1: data monopole ────────────────────────────────────────────────────
 fig, ax = plt.subplots(figsize=(7, 5))
 for d, label, color in zip(data_q, LABELS, COLORS):
-    ax.plot(d['s'], d['s']**2 * d['xi0'], color=color, lw=2, label=label)
+    band(ax, d, 'xi0', color=color, label=label)
 ax.axhline(0, color='k', lw=0.8, ls='--')
 ax.set_xlabel(r'$s\ [h^{-1}\,\mathrm{Mpc}]$')
 ax.set_ylabel(r'$s^2\,\xi_0(s)\ [h^{-2}\,\mathrm{Mpc}^2]$')
@@ -56,7 +72,7 @@ savefig(fig, 'data_monopole_per_quantile.png')
 # ── Figure 2: data quadrupole ──────────────────────────────────────────────────
 fig, ax = plt.subplots(figsize=(7, 5))
 for d, label, color in zip(data_q, LABELS, COLORS):
-    ax.plot(d['s'], d['s']**2 * d['xi2'], color=color, lw=2, label=label)
+    band(ax, d, 'xi2', color=color, label=label)
 ax.axhline(0, color='k', lw=0.8, ls='--')
 ax.set_xlabel(r'$s\ [h^{-1}\,\mathrm{Mpc}]$')
 ax.set_ylabel(r'$s^2\,\xi_2(s)\ [h^{-2}\,\mathrm{Mpc}^2]$')
@@ -66,11 +82,11 @@ ax.set_xlim(0, 150)
 fig.tight_layout()
 savefig(fig, 'data_quadrupole_per_quantile.png')
 
-# ── Figure 3: data monopole + quadrupole side by side ────────────────────────
+# ── Figure 3: data monopole + quadrupole side by side ─────────────────────────
 fig, axes = plt.subplots(1, 2, figsize=(12, 5))
 for d, label, color in zip(data_q, LABELS, COLORS):
-    axes[0].plot(d['s'], d['s']**2 * d['xi0'], color=color, lw=2, label=label)
-    axes[1].plot(d['s'], d['s']**2 * d['xi2'], color=color, lw=2, label=label)
+    band(axes[0], d, 'xi0', color=color, label=label)
+    band(axes[1], d, 'xi2', color=color, label=label)
 for ax, title, ell in zip(axes, ['Monopole', 'Quadrupole'], [0, 2]):
     ax.axhline(0, color='k', lw=0.8, ls='--')
     ax.set_xlabel(r'$s\ [h^{-1}\,\mathrm{Mpc}]$')
@@ -85,7 +101,7 @@ savefig(fig, 'data_multipoles_all_quantiles.png')
 # ── Figure 4: random monopole per quantile ────────────────────────────────────
 fig, ax = plt.subplots(figsize=(7, 5))
 for r, label, color in zip(rand_q, LABELS, COLORS):
-    ax.plot(r['s'], r['s']**2 * r['xi0'], color=color, lw=2, label=label)
+    band(ax, r, 'xi0', color=color, label=label)
 ax.axhline(0, color='k', lw=0.8, ls='--')
 ax.set_xlabel(r'$s\ [h^{-1}\,\mathrm{Mpc}]$')
 ax.set_ylabel(r'$s^2\,\xi_0(s)\ [h^{-2}\,\mathrm{Mpc}^2]$')
@@ -98,7 +114,7 @@ savefig(fig, 'rand_monopole_per_quantile.png')
 # ── Figure 5: random quadrupole per quantile ──────────────────────────────────
 fig, ax = plt.subplots(figsize=(7, 5))
 for r, label, color in zip(rand_q, LABELS, COLORS):
-    ax.plot(r['s'], r['s']**2 * r['xi2'], color=color, lw=2, label=label)
+    band(ax, r, 'xi2', color=color, label=label)
 ax.axhline(0, color='k', lw=0.8, ls='--')
 ax.set_xlabel(r'$s\ [h^{-1}\,\mathrm{Mpc}]$')
 ax.set_ylabel(r'$s^2\,\xi_2(s)\ [h^{-2}\,\mathrm{Mpc}^2]$')
@@ -112,9 +128,8 @@ savefig(fig, 'rand_quadrupole_per_quantile.png')
 fig, axes = plt.subplots(2, 2, figsize=(11, 8), sharex=True)
 for idx, ax in enumerate(axes.flat):
     d, r, color = data_q[idx], rand_q[idx], COLORS[idx]
-    s = d['s']
-    ax.plot(s, s**2 * d['xi0'], color=color, lw=2,   label='data')
-    ax.plot(s, s**2 * r['xi0'], color=color, lw=1.5, ls='--', label='randoms')
+    band(ax, d, 'xi0', color=color, label='data')
+    band(ax, r, 'xi0', color=color, label='randoms', lw=1.5, ls='--', alpha=0.15)
     ax.axhline(0, color='k', lw=0.8, ls=':')
     ax.set_title(f'Q{idx + 1}')
     ax.set_xlabel(r'$s\ [h^{-1}\,\mathrm{Mpc}]$')
@@ -125,11 +140,10 @@ fig.suptitle('Data vs ASTRA-random monopole per quantile', y=1.01)
 fig.tight_layout()
 savefig(fig, 'data_vs_rand_monopole.png')
 
-# ── Figure 7: full data auto-correlation ─────────────────────────────────────
+# ── Figure 7: full data auto-correlation ──────────────────────────────────────
 fig, axes = plt.subplots(1, 2, figsize=(12, 5))
-s = full['s']
-axes[0].plot(s, s**2 * full['xi0'], color='k', lw=2)
-axes[1].plot(s, s**2 * full['xi2'], color='k', lw=2)
+band(axes[0], full, 'xi0', color='k')
+band(axes[1], full, 'xi2', color='k')
 for ax, title, ell in zip(axes, ['Monopole', 'Quadrupole'], [0, 2]):
     ax.axhline(0, color='k', lw=0.8, ls='--')
     ax.set_xlabel(r'$s\ [h^{-1}\,\mathrm{Mpc}]$')
@@ -140,11 +154,11 @@ fig.suptitle('Full data auto-correlation  —  500 Mpc/h subbox, los=z', y=1.01)
 fig.tight_layout()
 savefig(fig, 'full_data_autocorr.png')
 
-# ── Figure 8: cross-correlation full data × data quantiles ───────────────────
+# ── Figure 8: cross-correlation full data × data quantiles ────────────────────
 fig, axes = plt.subplots(1, 2, figsize=(12, 5))
 for d, label, color in zip(cross_data_q, LABELS, COLORS):
-    axes[0].plot(d['s'], d['s']**2 * d['xi0'], color=color, lw=2, label=label)
-    axes[1].plot(d['s'], d['s']**2 * d['xi2'], color=color, lw=2, label=label)
+    band(axes[0], d, 'xi0', color=color, label=label)
+    band(axes[1], d, 'xi2', color=color, label=label)
 for ax, title, ell in zip(axes, ['Monopole', 'Quadrupole'], [0, 2]):
     ax.axhline(0, color='k', lw=0.8, ls='--')
     ax.set_xlabel(r'$s\ [h^{-1}\,\mathrm{Mpc}]$')
@@ -156,11 +170,11 @@ fig.suptitle('Cross-correlation: full data × ASTRA data quantiles', y=1.01)
 fig.tight_layout()
 savefig(fig, 'cross_full_data_quantiles.png')
 
-# ── Figure 9: cross-correlation full data × random quantiles ─────────────────
+# ── Figure 9: cross-correlation full data × random quantiles ──────────────────
 fig, axes = plt.subplots(1, 2, figsize=(12, 5))
 for r, label, color in zip(cross_rand_q, LABELS, COLORS):
-    axes[0].plot(r['s'], r['s']**2 * r['xi0'], color=color, lw=2, label=label)
-    axes[1].plot(r['s'], r['s']**2 * r['xi2'], color=color, lw=2, label=label)
+    band(axes[0], r, 'xi0', color=color, label=label)
+    band(axes[1], r, 'xi2', color=color, label=label)
 for ax, title, ell in zip(axes, ['Monopole', 'Quadrupole'], [0, 2]):
     ax.axhline(0, color='k', lw=0.8, ls='--')
     ax.set_xlabel(r'$s\ [h^{-1}\,\mathrm{Mpc}]$')

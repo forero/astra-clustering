@@ -62,10 +62,11 @@ Available tags: `main` (rolling), `2026_02`, `2025_12`, `2025_05`, `dr1`.
 ### 1. Get a compute node
 
 ```bash
-salloc -N 1 -C cpu -q interactive -t 30:00 -A desi -c 8 --mem=32G
+salloc -N 1 -C cpu -q interactive -t 60:00 -A desi -c 8 --mem=32G
 ```
 
-Increase `-t` if needed — the Delaunay step on ~125k points takes ~5–10 min.
+Increase `-t` if needed — with N_ASTRA_ITERATIONS=10 the full run takes ~60–90 min
+(each iteration: ~5–10 min Delaunay + ~10 min 2PCF for 16 correlation functions).
 
 ### 2. Load environment and run
 
@@ -90,31 +91,26 @@ python scripts/plot.py        # no srun needed — lightweight
 
 3. **Cut** a 500 Mpc/h cube centred at the origin (~62k galaxies)
 
-4. **ASTRA randoms** (`N_RAND=1×`): uniform in the subbox, used for the
-   Delaunay triangulation and then split by environment alongside the data
+4. **Geometry randoms** (`N_RAND_GEOM=5×`, `SEED_GEOM=SEED+1000`): generated
+   **once before the loop**, used only for the Landy-Szalay 2PCF estimator.  
+   The subbox has **open boundaries** — `boxsize=` periodic BC must not be used.
 
-5. **Run ASTRA**: Delaunay → neighbour counts → `r` for every point
-   (data and randoms alike)
+5. **Full-data auto-correlation** (once, outside the loop): deterministic,
+   same each iteration.
 
-6. **Split into quantiles**: bin edges from the data `r` distribution
-   (`pd.qcut`); same edges applied to randoms (`pd.cut`)
+6. **Repeat N_ASTRA_ITERATIONS times** (seed = SEED + iteration):  
+   a. Generate new ASTRA randoms (`N_RAND=1×`, uniform, bounds from data min/max)  
+   b. Build combined data+random dataframe  
+   c. Run ASTRA: Delaunay → neighbour counts → `r` for every point  
+   d. Split into quantiles: bin edges from data `r` (`pd.qcut`); same edges
+      applied to randoms (`pd.cut`)  
+   e. Compute 2PCF (ℓ=0, ℓ=2) for: data quantile autos, random quantile autos,
+      full data × data quantile cross, full data × random quantile cross  
+   f. Accumulate multipole arrays across iterations  
+   g. On the **last** iteration: save per-quantile catalogs + pycorr objects
 
-7. **Save per-quantile files**:
-   - `data_quantile_q{1..4}.npy`
-   - `rand_quantile_q{1..4}.npy`
-
-8. **Geometry randoms** (`N_RAND_GEOM=5×`, `SEED+1`): fresh uniform
-   randoms used **only** for the Landy-Szalay 2PCF estimator.  
-   The subbox has **open boundaries** — `boxsize=` periodic BC must not
-   be used in pycorr.
-
-9. **Compute 2PCF** (monopole ℓ=0 + quadrupole ℓ=2) for each data and
-   random quantile: Landy-Szalay `(DD − 2DR + RR) / RR` with pycorr.
-
-10. **Save**:
-    - `multipoles_tpcf_data_q{q}.npz` — keys: `s`, `xi0`, `xi2`
-    - `multipoles_tpcf_rand_q{q}.npz` — keys: `s`, `xi0`, `xi2`
-    - `tpcf_data_q{q}.npy` / `tpcf_rand_q{q}.npy` — full pycorr objects
+7. **Save averaged multipoles**: mean and std (ddof=1) over all iterations.  
+   Keys in each `.npz`: `s`, `xi0`, `xi0_std`, `xi2`, `xi2_std`
 
 Output directory: `data/` (inside the repo)
 
@@ -122,8 +118,8 @@ Output directory: `data/` (inside the repo)
 
 | Catalog | Size | Seed | Purpose |
 |---------|------|------|---------|
-| ASTRA randoms | 1× data | `SEED` | Enter Delaunay; split by environment — their `r` value is physically meaningful |
-| Geometry randoms | 5× data | `SEED+1` | Uniform; correct for open-boundary geometry in the LS estimator only |
+| ASTRA randoms | 1× data | `SEED + iteration` | Enter Delaunay; split by environment; regenerated each iteration |
+| Geometry randoms | 5× data | `SEED + 1000` | Uniform; correct for open-boundary geometry in LS estimator; fixed across iterations |
 
 ---
 
@@ -158,6 +154,8 @@ quantiles cluster just as overdense galaxies do.
 | `N_Q` | 4 | Number of ASTRA quantiles |
 | `N_RAND` | 1 | ASTRA randoms factor |
 | `N_RAND_GEOM` | 5 | Geometry randoms factor |
-| `SEED` | 42 | RNG seed (geometry randoms use SEED+1) |
+| `N_ASTRA_ITERATIONS` | 10 | Number of independent ASTRA random realisations |
+| `SEED` | 42 | Base RNG seed; iteration i uses `SEED+i` for ASTRA randoms |
+| `SEED_GEOM` | 1042 | Geometry randoms seed (fixed, `SEED+1000`) |
 | `NTHREADS` | 8 | CPU threads for pycorr / corrfunc |
 | `S_EDGES` | 0–150 Mpc/h, 30 bins | 2PCF s binning |
