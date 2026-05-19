@@ -1,0 +1,195 @@
+"""
+Minimal standalone ASTRA implementation.
+
+ASTRA classifies each galaxy by its local cosmic-web environment
+(void / sheet / filament / knot) using a Delaunay triangulation over the
+combined data + random catalog:
+
+  r = (ndata_neighbours - nrand_neighbours) / (ndata_neighbours + nrand_neighbours)
+
+  r ∈ [−1, −0.9]  → void
+  r ∈ (−0.9,  0]  → sheet
+  r ∈ (  0,  0.9] → filament
+  r ∈ (0.9,   1]  → knot
+
+Galaxies are then grouped into quantiles of r (Q1 = most underdense,
+Q4 = most overdense).  The same bin edges are applied to the randoms so both
+populations are split at identical density thresholds.
+"""
+
+import numpy as np
+import pandas as pd
+from itertools import combinations
+from scipy.spatial import Delaunay
+from tqdm import tqdm
+
+
+class AstraSplit:
+
+    def __init__(self):
+        pass
+
+    # ── random generation ──────────────────────────────────────────────────────
+
+    def generate_uniform_randoms(self, positions, boxsize, n_factor=1, seed=None):
+        """
+        Draw uniform randoms inside a box centred at the origin.
+
+        Parameters
+        ----------
+        positions : (N, 3) array
+        boxsize   : (3,) array  — side lengths in Mpc/h
+        n_factor  : int         — randoms = n_factor × len(positions)
+        seed      : int or None
+
+        Returns
+        -------
+        random_positions : (n_factor*N, 3) array
+        """
+        boxsize = np.asarray(boxsize)
+        n_rand  = n_factor * len(positions)
+        rng     = np.random.default_rng(seed)
+        return rng.uniform(low=-boxsize / 2, high=boxsize / 2, size=(n_rand, 3))
+
+    # ── dataframe builder ──────────────────────────────────────────────────────
+
+    def build_dataframe(self, positions, random_positions):
+        """
+        Concatenate data and randoms into a single ASTRA-format DataFrame.
+
+        Data rows get RANDITER = -1; random rows get RANDITER = 0.
+        TARGETID is a contiguous integer index: 0…n_data−1 for data,
+        n_data…n_data+n_rand−1 for randoms — used later to map rows back
+        to the original position arrays.
+        """
+        n_data = len(positions)
+        n_rand = len(random_positions)
+
+        df_data = pd.DataFrame({
+            'TARGETID': np.arange(n_data),
+            'XCART':    positions[:, 0],
+            'YCART':    positions[:, 1],
+            'ZCART':    positions[:, 2],
+            'RANDITER': -1,
+        })
+        df_rand = pd.DataFrame({
+            'TARGETID': np.arange(n_data, n_data + n_rand),
+            'XCART':    random_positions[:, 0],
+            'YCART':    random_positions[:, 1],
+            'ZCART':    random_positions[:, 2],
+            'RANDITER': 0,
+        })
+        return pd.concat([df_data, df_rand], ignore_index=True)
+
+    # ── core ASTRA algorithm ───────────────────────────────────────────────────
+
+    def classify(self, df):
+        """
+        Run the ASTRA classification on a combined data+random DataFrame.
+
+        1. Build a Delaunay triangulation over all points.
+        2. For each point i, count data neighbours (ndata) and random
+           neighbours (nrand) from the triangulation graph.
+        3. For data points: r = (ndata - nrand) / (ndata + nrand).
+
+        Parameters
+        ----------
+        df : DataFrame with columns XCART, YCART, ZCART, TARGETID, RANDITER
+
+        Returns
+        -------
+        class_rows : list of (TARGETID, RANDITER, ISDATA, NDATA, NRAND) tuples
+        """
+        coords    = df[['XCART', 'YCART', 'ZCART']].values
+        targetids = df['TARGETID'].values
+        is_data   = (df['RANDITER'] == -1).values
+        n_points  = len(coords)
+
+        if n_points < 4:
+            raise ValueError('Need at least 4 points for Delaunay triangulation.')
+
+        print(f'Delaunay triangulation on {n_points:,} points ...')
+        tri       = Delaunay(coords)
+        neighbors = {i: set() for i in range(n_points)}
+
+        for simplex in tqdm(tri.simplices, desc='Building neighbour graph'):
+            for i, j in combinations(simplex, 2):
+                neighbors[i].add(j)
+                neighbors[j].add(i)
+
+        print('Computing local densities ...')
+        class_rows = []
+        for i, nbrs in tqdm(neighbors.items(), desc='Classifying points'):
+            nbr_list = list(nbrs)
+            ndata    = int(np.sum(is_data[nbr_list]))
+            nrand    = len(nbr_list) - ndata
+            class_rows.append((
+                int(targetids[i]),
+                0,
+                bool(is_data[i]),
+                ndata,
+                nrand,
+            ))
+
+        return class_rows
+
+    # ── quantile assignment ────────────────────────────────────────────────────
+
+    def assign_quantiles(self, class_rows, n_quantiles=4):
+        """
+        Convert classification rows to a DataFrame with QUARTILE labels.
+
+        Bin edges are derived from the *data* r distribution (pd.qcut).
+        The same edges are applied to the *randoms* (pd.cut) so both
+        populations are split at identical density thresholds.
+
+        Parameters
+        ----------
+        class_rows  : output of classify()
+        n_quantiles : int
+
+        Returns
+        -------
+        df : DataFrame with columns
+             TARGETID, ISDATA_BOOL, r, QUARTILE
+             QUARTILE is 1…n_quantiles for both data and randoms.
+        """
+        df = pd.DataFrame(
+            class_rows,
+            columns=['TARGETID', 'RANDITER', 'ISDATA', 'NDATA', 'NRAND'],
+        )
+        df['ISDATA_BOOL'] = df['ISDATA'].astype(bool)
+        df['r'] = np.where(
+            (df['NDATA'] + df['NRAND']) > 0,
+            (df['NDATA'] - df['NRAND']) / (df['NDATA'] + df['NRAND']),
+            np.nan,
+        )
+
+        data_mask = df['ISDATA_BOOL'] & df['r'].notna()
+        rand_mask = ~df['ISDATA_BOOL'] & df['r'].notna()
+
+        # Bin edges from data distribution
+        _, bin_edges = pd.qcut(
+            df.loc[data_mask, 'r'], n_quantiles,
+            retbins=True, duplicates='drop',
+        )
+        n_bins         = len(bin_edges) - 1
+        bin_edges[0]   = -np.inf
+        bin_edges[-1]  =  np.inf
+        labels         = list(range(1, n_bins + 1))
+
+        df['QUARTILE'] = np.nan
+        df.loc[data_mask, 'QUARTILE'] = pd.qcut(
+            df.loc[data_mask, 'r'], n_quantiles,
+            labels=labels, duplicates='drop',
+        ).astype(float)
+
+        df.loc[rand_mask, 'QUARTILE'] = pd.cut(
+            df.loc[rand_mask, 'r'],
+            bins=bin_edges, labels=labels, include_lowest=True,
+        ).astype(float)
+
+        print('Quantile distribution (data):')
+        print(df.loc[data_mask, 'QUARTILE'].value_counts().sort_index().to_string())
+
+        return df
