@@ -129,15 +129,19 @@ Output: `plots/` (inside the repo)
 
 | File | Content |
 |------|---------|
-| `data_monopole_per_quantile.png` | s²ξ₀(s) for data Q1–Q4 |
-| `data_quadrupole_per_quantile.png` | s²ξ₂(s) for data Q1–Q4 |
+| `data_monopole_per_quantile.png` | s²ξ₀(s) for data Q1–Q4 (mean ± 1σ) |
+| `data_quadrupole_per_quantile.png` | s²ξ₂(s) for data Q1–Q4 (mean ± 1σ) |
 | `data_multipoles_all_quantiles.png` | Monopole + quadrupole side by side |
-| `rand_monopole_per_quantile.png` | s²ξ₀(s) for random Q1–Q4 |
-| `rand_quadrupole_per_quantile.png` | s²ξ₂(s) for random Q1–Q4 |
+| `rand_monopole_per_quantile.png` | s²ξ₀(s) for random Q1–Q4 (mean ± 1σ) |
+| `rand_quadrupole_per_quantile.png` | s²ξ₂(s) for random Q1–Q4 (mean ± 1σ) |
 | `data_vs_rand_monopole.png` | Data vs randoms monopole, 2×2 panel per quantile |
 | `full_data_autocorr.png` | Full sample auto-correlation monopole + quadrupole |
 | `cross_full_data_quantiles.png` | Cross-correlation full data × each data quantile |
 | `cross_full_rand_quantiles.png` | Cross-correlation full data × each random quantile |
+| `cov_data_quantiles.png` | Normalised correlation matrices for data quantiles (2×4 grid: ℓ=0,2 × Q1–Q4) |
+| `cov_rand_quantiles.png` | Normalised correlation matrices for random quantiles |
+| `cov_cross_full_data_quantiles.png` | Normalised correlation matrices for full×data cross-corrs |
+| `cov_cross_full_rand_quantiles.png` | Normalised correlation matrices for full×random cross-corrs |
 
 The random quantile 2PCF is non-trivial (not ≈ 0) because ASTRA randoms
 trace the same cosmic-web environments as the data — overdense random

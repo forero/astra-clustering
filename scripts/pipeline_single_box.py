@@ -217,7 +217,9 @@ for stem in all_stems:
              xi0=xi0_arr.mean(axis=0),
              xi0_std=xi0_arr.std(axis=0, ddof=1),
              xi2=xi2_arr.mean(axis=0),
-             xi2_std=xi2_arr.std(axis=0, ddof=1))
+             xi2_std=xi2_arr.std(axis=0, ddof=1),
+             xi0_all=xi0_arr,
+             xi2_all=xi2_arr)
     print(f'  {stem}: saved (N={N_ASTRA_ITERATIONS})')
 
 print('\n=== Done ===')

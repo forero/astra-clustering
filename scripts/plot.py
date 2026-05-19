@@ -3,6 +3,8 @@
 Plot 2PCF results from pipeline_single_box.py.
 
 Lines show the mean over N_ASTRA_ITERATIONS; shaded bands show ±1σ.
+Covariance figures show the normalized correlation matrix (r_ij) derived
+from the per-iteration multipole arrays saved in each .npz file.
 
 Run from any node (no srun needed):
   python scripts/plot.py
@@ -26,11 +28,16 @@ LABELS = [f'Q{q}' for q in range(1, N_Q + 1)]
 # ── load multipoles ────────────────────────────────────────────────────────────
 def load(stem):
     d = np.load(DATA_DIR / f'multipoles_{stem}.npz')
-    return {
+    out = {
         's':       d['s'],
         'xi0':     d['xi0'],     'xi0_std': d['xi0_std'],
         'xi2':     d['xi2'],     'xi2_std': d['xi2_std'],
     }
+    # per-iteration arrays present for all stems except full_data
+    if 'xi0_all' in d:
+        out['xi0_all'] = d['xi0_all']
+        out['xi2_all'] = d['xi2_all']
+    return out
 
 data_q       = [load(f'tpcf_data_q{q}')             for q in range(1, N_Q + 1)]
 rand_q       = [load(f'tpcf_rand_q{q}')             for q in range(1, N_Q + 1)]
@@ -38,6 +45,8 @@ cross_data_q = [load(f'tpcf_cross_full_data_q{q}')  for q in range(1, N_Q + 1)]
 cross_rand_q = [load(f'tpcf_cross_full_rand_q{q}')  for q in range(1, N_Q + 1)]
 full         =  load('tpcf_full_data')
 
+
+# ── plotting helpers ───────────────────────────────────────────────────────────
 
 def band(ax, d, key, color, label=None, lw=2, ls='-', alpha=0.2):
     """Plot mean line with ±1σ shaded band."""
@@ -47,6 +56,17 @@ def band(ax, d, key, color, label=None, lw=2, ls='-', alpha=0.2):
     ax.plot(s, s**2 * y, color=color, lw=lw, ls=ls, label=label)
     ax.fill_between(s, s**2 * (y - ye), s**2 * (y + ye),
                     color=color, alpha=alpha)
+
+
+def corr_matrix(arr):
+    """Normalized correlation matrix from an (N_iter, n_bins) array."""
+    C   = np.cov(arr, rowvar=False)          # (n_bins, n_bins)
+    std = np.sqrt(np.diag(C))
+    with np.errstate(invalid='ignore'):
+        R = C / np.outer(std, std)
+    np.fill_diagonal(R, 1.0)
+    R = np.nan_to_num(R, nan=0.0)
+    return R
 
 
 def savefig(fig, name):
@@ -185,5 +205,64 @@ for ax, title, ell in zip(axes, ['Monopole', 'Quadrupole'], [0, 2]):
 fig.suptitle('Cross-correlation: full data × ASTRA random quantiles', y=1.01)
 fig.tight_layout()
 savefig(fig, 'cross_full_rand_quantiles.png')
+
+
+# ── Covariance figures (Figures 10–13) ────────────────────────────────────────
+# Each shows a 2-row × N_Q-column grid of normalised correlation matrices.
+# Rows: monopole (ℓ=0) and quadrupole (ℓ=2).
+# Columns: quantiles Q1–Q4.
+# Colour scale: RdBu_r, symmetric around 0, range [-1, 1].
+
+def cov_figure(data_list, suptitle, filename):
+    s = data_list[0]['s']
+    extent = [s[0], s[-1], s[0], s[-1]]
+
+    fig, axes = plt.subplots(2, N_Q, figsize=(4 * N_Q, 7), squeeze=False)
+    im = None
+    for q_idx, d in enumerate(data_list):
+        for row, (key, ell) in enumerate([('xi0', 0), ('xi2', 2)]):
+            ax  = axes[row, q_idx]
+            R   = corr_matrix(d[key + '_all'])
+            im  = ax.imshow(R, origin='lower', vmin=-1, vmax=1,
+                            cmap='RdBu_r', extent=extent, aspect='auto')
+            ax.set_title(f'{LABELS[q_idx]}   $\\ell={ell}$', fontsize=10)
+            ax.set_xlabel(r'$s\ [h^{-1}\,\mathrm{Mpc}]$', fontsize=8)
+            if q_idx == 0:
+                ax.set_ylabel(r'$s\ [h^{-1}\,\mathrm{Mpc}]$', fontsize=8)
+
+    fig.colorbar(im, ax=axes, label='Correlation coefficient',
+                 shrink=0.6, pad=0.02)
+    fig.suptitle(suptitle, y=1.01)
+    fig.tight_layout()
+    savefig(fig, filename)
+
+
+# Figure 10: data quantile correlation matrices
+cov_figure(
+    data_q,
+    'Data quantile correlation matrices  (ASTRA variance)',
+    'cov_data_quantiles.png',
+)
+
+# Figure 11: random quantile correlation matrices
+cov_figure(
+    rand_q,
+    'Random quantile correlation matrices  (ASTRA variance)',
+    'cov_rand_quantiles.png',
+)
+
+# Figure 12: cross full data × data quantile correlation matrices
+cov_figure(
+    cross_data_q,
+    'Cross-corr (full data × data quantile) correlation matrices  (ASTRA variance)',
+    'cov_cross_full_data_quantiles.png',
+)
+
+# Figure 13: cross full data × random quantile correlation matrices
+cov_figure(
+    cross_rand_q,
+    'Cross-corr (full data × random quantile) correlation matrices  (ASTRA variance)',
+    'cov_cross_full_rand_quantiles.png',
+)
 
 print('Done.')
