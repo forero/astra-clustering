@@ -1,0 +1,293 @@
+\documentclass[11pt]{article}
+
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{hyperref}
+
+\graphicspath{{../../plots/derivatives/}}
+
+\newcommand{\Mpch}{\,h^{-1}\,\mathrm{Mpc}}
+
+\title{Technical note: Fisher-matrix estimates from ASTRA
+environment-split clustering}
+\author{ASTRA clustering project}
+\date{June 2026}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+We present the setup and first results of a Fisher-matrix forecast based
+on the two-point clustering of an HOD galaxy sample split by cosmic-web
+environment with the ASTRA classification.  Derivatives with respect to
+the cosmological parameters come from central differences over the
+AbacusSummit linear derivative grid; the covariance comes from 64
+subboxes of the fiducial simulation.  With the $\omega_b$ pair complete,
+we compare the constraining power of the individual auto- and
+cross-correlations.  The cross-correlation of the full sample with the
+overdense environment quantiles carries slightly more information than
+the full-sample auto-correlation itself.  All absolute uncertainties are
+still optimistic because the available HOD catalogs are not matched
+across cosmologies.
+\end{abstract}
+
+\section{Method}
+
+For a single parameter $\theta$, the Fisher information of a data vector
+$\boldsymbol{\xi}$ with covariance $\mathsf{C}$ is
+\begin{equation}
+F \;=\;
+\frac{\partial \boldsymbol{\xi}}{\partial \theta}^{\!\top}
+\mathsf{C}^{-1}
+\frac{\partial \boldsymbol{\xi}}{\partial \theta},
+\qquad
+\sigma(\theta) \;=\; F^{-1/2}
+\label{eq:fisher}
+\end{equation}
+\cite{tegmark1997}.  Our data vectors are built from the redshift-space
+2PCF multipoles ($\ell = 0, 2$; 15 bins over $0 < s < 150\Mpch$) of the
+full LRG-like sample, of the four ASTRA environment quantiles (Q1 = most
+underdense, Q4 = most overdense), and of their cross-correlations with
+the full sample.  The measurement pipeline (Landy--Szalay estimator over
+a $4\times4\times4$ grid of $500\Mpch$ subboxes) is described in the
+companion zero-crossing note.
+
+The derivative for each parameter comes from the simulation pair that
+brackets the fiducial cosmology.  We difference the \emph{same} subbox
+$i$ in the two cosmologies before averaging,
+\begin{equation}
+\frac{\partial \boldsymbol{\xi}_i}{\partial \theta}
+\;=\;
+\frac{\boldsymbol{\xi}_i(\theta + \Delta\theta)
+    - \boldsymbol{\xi}_i(\theta - \Delta\theta)}{2\,\Delta\theta}.
+\label{eq:centraldiff}
+\end{equation}
+Because all derivative-grid simulations share the initial-condition
+phases of the fiducial box, and our pipelines also share all random
+seeds, most of the cosmic variance cancels in
+Eq.~(\ref{eq:centraldiff}); the paired estimate is about twice as
+precise as differencing independent volumes.  The mean over the 64
+subboxes gives the derivative and its scatter gives the derivative
+uncertainty.
+
+The covariance $\mathsf{C}$ is estimated from the 64 fiducial subboxes.
+An inverse covariance built from $n$ samples and $p$ bins is biased, so
+we apply the standard correction $(n - p - 2)/(n - 1)$
+\cite{hartlap2007}.  Noise in the derivative adds spurious Fisher
+information with expectation
+$\mathrm{tr}(\mathsf{C}^{-1}\boldsymbol{\Sigma}_{d})$, where
+$\boldsymbol{\Sigma}_{d}$ is the covariance of the derivative estimate;
+we subtract this term and quote it as the ``noise share'' of each data
+vector.
+
+Figure~\ref{fig:covariances} shows the covariance matrices that enter
+Eq.~(\ref{eq:fisher}), in their normalised form
+$R_{ij} = \mathsf{C}_{ij} / \sqrt{\mathsf{C}_{ii}\mathsf{C}_{jj}}$
+(the raw covariance spans too many orders of magnitude to display).
+The single-statistic matrices show the expected structure: neighbouring
+separation bins are strongly correlated, and the correlation length
+grows toward large $s$, where the same long-wavelength modes dominate
+every bin.  The concatenated vector makes the cross-blocks visible.
+The full auto and the full $\times$ data Q4 blocks are almost perfectly
+correlated with each other --- this is the redundancy discussed in
+Section 4.  In contrast, the full $\times$ random Q1 block is strongly
+\emph{anti}-correlated with the other two: when a subbox scatters high
+in clustering amplitude, its underdense-environment cross scatters low.
+This anti-correlation is the only genuinely complementary information
+in the concatenation.
+
+\begin{figure}[ht]
+\centering
+\includegraphics[width=\textwidth]{fisher_covariances.png}
+\caption{Correlation matrices of the data vectors used in the Fisher
+comparison, estimated from the 64 fiducial subboxes.  Black lines in
+the right panel separate the three concatenated pieces (full auto,
+full $\times$ data Q4, full $\times$ random Q1; 8 rebinned bins each).
+Panel titles give the number of bins and the corresponding
+$(n-p-2)/(n-1)$ correction factor.}
+\label{fig:covariances}
+\end{figure}
+
+\paragraph{From $\sigma$ to the plotted curves.}
+The curves we show later are not measured posteriors; they are the
+likelihood implied by the Fisher formalism.  In one dimension the
+Fisher approach expands the log-likelihood to second order around its
+maximum, which is placed at the fiducial value $\theta_{\rm fid}$.  The
+quadratic term is the Fisher information $F$, and every higher-order
+term is dropped, so the likelihood is \emph{by construction} a Gaussian,
+\begin{equation}
+\mathcal{L}(\theta) \;\propto\;
+\exp\!\left[ -\tfrac{1}{2} F \,(\theta - \theta_{\rm fid})^{2} \right]
+\;=\;
+\exp\!\left[ -\frac{(\theta - \theta_{\rm fid})^{2}}{2\,\sigma^{2}}
+\right],
+\qquad \sigma = F^{-1/2}.
+\label{eq:gauss}
+\end{equation}
+This is exact when the data are Gaussian-distributed and the model
+$\boldsymbol{\xi}(\theta)$ is linear in $\theta$ over the range of
+interest; otherwise it is the leading approximation.  We plot
+Eq.~(\ref{eq:gauss}) normalised to unit peak, so only the width carries
+information.  When the derivative is taken with respect to a logarithm,
+such as $\ln\omega_b$, the width in the physical parameter follows from
+the same expansion: $\sigma(\omega_b) = \omega_{b,{\rm fid}}\,
+\sigma(\ln\omega_b)$.
+
+\section{Simulations}
+
+Table~\ref{tab:cosmologies} lists the nine simulations of the design:
+the fiducial cosmology and the four $\pm$ pairs of the AbacusSummit
+linear derivative grid \cite{maksimova2021}, all at phase
+\texttt{ph000}, $z = 0.5$.  Each is populated with an LRG-like HOD
+catalog ($\sim 4\times10^{6}$ galaxies) from the EMC emulator set.  In
+that set, every cosmology carries its own random draws from the HOD
+prior, so no identical HOD exists across cosmologies.  The catalogs in
+Table~\ref{tab:cosmologies} were selected to minimise the HOD-parameter
+mismatch inside each $\pm$ pair around a common mid-prior anchor point
+(pair distances 0.14--0.16 of the prior range, against 0.40 for random
+draws).  Galaxy number density is matched by construction.
+
+\begin{table}[ht]
+\centering
+\begin{tabular}{llll}
+\toprule
+Cosmology & Variation & HOD catalog & Status \\
+\midrule
+\texttt{c000} & fiducial (Planck 2018 $\Lambda$CDM) & \texttt{hod484} & complete \\
+\texttt{c100} / \texttt{c101} & $\pm 2\%$ in $\ln\omega_b$ & \texttt{hod179} / \texttt{hod152} & complete \\
+\texttt{c102} / \texttt{c103} & $\pm 3.3\%$ in $\ln\omega_{cdm}$ & \texttt{hod556} / \texttt{hod861} & queued \\
+\texttt{c104} / \texttt{c105} & $\pm 0.01$ in $n_s$ & \texttt{hod498} / \texttt{hod589} & queued \\
+\texttt{c112} / \texttt{c113} & $\pm 2\%$ in $\sigma_8$ & \texttt{hod507} / \texttt{hod483} & queued \\
+\bottomrule
+\end{tabular}
+\caption{Simulations of the 4-parameter $\Lambda$CDM Fisher design.  All
+are AbacusSummit base boxes ($2000\Mpch$, phase \texttt{ph000}).  The
+grid holds the CMB acoustic scale $\theta_\ast$ fixed (h is retuned) and,
+except for the $\sigma_8$ pair, retunes $A_s$ so that $\sigma_8$ stays
+constant.  Status at the time of writing.}
+\label{tab:cosmologies}
+\end{table}
+
+The residual HOD mismatch matters.  The measured
+\texttt{c100}$-$\texttt{c101} difference is a scale-dependent $-6\%$ to
+$+9\%$ tilt of $\xi_0$, while the physical $\omega_b$ signal at fixed
+$\sigma_8$ and $\theta_\ast$ is only $\sim 1\%$.  The derivative is
+therefore still dominated by the different galaxy--halo connections of
+the two catalogs, and it is not a flat offset, so a simple amplitude
+nuisance cannot absorb it completely.  All absolute uncertainties in
+this note are too small for this reason; we read them as a
+\emph{relative} comparison between data vectors.  A planned correction
+is to measure the HOD response $\partial\xi/\partial\theta_{\rm HOD}$
+from additional existing fiducial catalogs and subtract it.
+
+\section{Derivatives}
+
+Figure~\ref{fig:derivatives} shows the central-difference derivative of
+every statistic with respect to $\ln\omega_b$, from
+Eq.~(\ref{eq:centraldiff}) applied to the 64 paired subboxes.  The
+derivative of the full-sample auto-correlation is detected with a
+signal-to-noise ratio of up to $\sim 19$ per bin at small separations;
+at $s \gtrsim 80\Mpch$ several bins are consistent with zero.  The
+quantile statistics inherit the same tilt with larger noise.  These are
+the inputs to Eq.~(\ref{eq:fisher}).
+
+\begin{figure}[ht]
+\centering
+\includegraphics[width=\textwidth]{derivative_lnwb.png}
+\caption{Central-difference derivatives $\partial\xi_\ell/\partial
+\ln\omega_b$ for all measured statistics (columns: full auto, data
+quantile autos, random quantile autos, full $\times$ data quantiles,
+full $\times$ random quantiles; rows: monopole and quadrupole).  Lines
+are the mean over 64 paired subboxes; bands are the error of the mean.}
+\label{fig:derivatives}
+\end{figure}
+
+\section{Results}
+
+Table~\ref{tab:fisher} lists the one-parameter uncertainties for the
+six best-measured data vectors, and Figure~\ref{fig:gaussians} shows a
+selection as Gaussian likelihoods around the fiducial value.
+
+\begin{table}[ht]
+\centering
+\begin{tabular}{lcc}
+\toprule
+Data vector ($\ell = 0, 2$) & $\sigma(\ln\omega_b)$ per subbox & noise share \\
+\midrule
+Full $\times$ data Q3 & 0.0092 & 3\% \\
+Full auto             & 0.0102 & 3\% \\
+Full $\times$ data Q4 & 0.0107 & 4\% \\
+Random Q1 auto        & 0.0115 & 4\% \\
+Data Q3 auto          & 0.0123 & 6\% \\
+Data Q4 auto          & 0.0151 & 7\% \\
+\bottomrule
+\end{tabular}
+\caption{One-parameter Fisher uncertainties for $\ln\omega_b$ from a
+single $500\Mpch$ subbox volume (divide by 8 for the full box), with the
+Hartlap correction applied and the derivative-noise information
+subtracted.  ``Noise share'' is the subtracted fraction.  Statistics not
+listed are noise-dominated at the current derivative precision.}
+\label{tab:fisher}
+\end{table}
+
+Three lessons emerge.  First, the cross-correlations of the full sample
+with the overdense quantiles (Q3, Q4) carry slightly more information
+than the full-sample auto-correlation itself: the cross keeps the low
+shot noise of the full sample while the environment selection sharpens
+the response.  Second, the quadrupole adds almost nothing for
+$\omega_b$: doubling the number of bins costs more through the
+$(n-p-2)/(n-1)$ factor than the new bins contribute.  Third,
+concatenating vectors that share the full-sample leg (full auto
+$\oplus$ full $\times$ data Q4 $\oplus$ full $\times$ random Q1) ties
+with the full auto alone, even after compressing each piece from 15 to
+8 bins to soften the covariance penalty: the pieces are too correlated.
+Real gains must come from independent tracers in the data vector or
+from more covariance realisations.
+
+\begin{figure}[ht]
+\centering
+\includegraphics[width=0.95\textwidth]{fisher_gaussians_lnwb.png}
+\caption{Fisher uncertainties for $\omega_b$ shown as Gaussian
+likelihoods around the fiducial value, for one subbox volume (left) and
+the full box (right).  The concatenated vector ties with the full-sample
+auto-correlation; the underdense-random cross is several times weaker.
+All widths are optimistic because of the HOD mismatch discussed in
+Section~2.}
+\label{fig:gaussians}
+\end{figure}
+
+\section{Next steps}
+
+The remaining pairs of Table~\ref{tab:cosmologies} complete the
+4-parameter design; the same scripts process them automatically.  The
+$\sigma_8$ pair is the most important test: its physical signal
+($\sim 8\%$ in amplitude across the pair) should dominate both the
+noise and the residual HOD contamination, unlike $\omega_b$.  The two
+structural improvements identified here are an HOD-response correction
+built from additional fiducial catalogs, and a larger set of covariance
+realisations so that longer concatenated data vectors become usable.
+
+\begin{thebibliography}{9}
+
+\bibitem{tegmark1997}
+M.~Tegmark, A.~N.~Taylor, A.~F.~Heavens,
+\emph{Karhunen-Lo\`eve eigenvalue problems in cosmology: how should we
+tackle large data sets?}, ApJ 480, 22 (1997).
+
+\bibitem{maksimova2021}
+N.~A.~Maksimova et al.,
+\emph{AbacusSummit: a massive set of high-accuracy, high-resolution
+N-body simulations}, MNRAS 508, 4017 (2021).
+
+\bibitem{hartlap2007}
+J.~Hartlap, P.~Simon, P.~Schneider,
+\emph{Why your model parameter confidences may be too optimistic.
+Unbiased estimation of the inverse covariance matrix},
+A\&A 464, 399 (2007).
+
+\end{thebibliography}
+
+\end{document}
