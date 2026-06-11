@@ -31,21 +31,29 @@ Q4 = most overdense).  The same bin edges are applied to the randoms.
 
 ```
 astra-clustering/
-├── astra.py          ← ASTRA algorithm module
+├── astra.py          ← ASTRA algorithm module (classify for small catalogs,
+│                       classify_fast for full-box scale; identical results)
 ├── scripts/
 │   ├── pipeline_single_box.py    ← end-to-end pipeline (load → classify → split → 2PCF)
 │   ├── pipeline_subboxes.py      ← 64-subbox loop on c000 hod000 (cosmic variance)
 │   ├── pipeline_subboxes_cosmo.py← same, parameterised by (cosmo, hod) → data/{cosmo}_hod{NNN}/
+│   ├── pipeline_fullbox_cosmo.py ← whole 2000 Mpc/h box per (cosmo, hod) → data/fullbox/…/
 │   ├── plot.py                   ← figures for pipeline_single_box output
 │   ├── plot_subboxes.py          ← figures for pipeline_subboxes output
-│   └── plot_subboxes_cosmo.py    ← 7 deduplicated figures per (cosmo, hod) run
+│   ├── plot_subboxes_cosmo.py    ← 7 deduplicated figures per (cosmo, hod) subbox run
+│   ├── plot_fullbox_cosmo.py     ← 3 figures per (cosmo, hod) full-box run
+│   ├── compute_derivatives.py    ← central-difference derivatives from completed ± pairs
+│   └── plot_fisher_gaussians.py  ← per-data-vector Fisher σ as Gaussians around fiducial
 ├── queue/
 │   ├── run_single_box.sh         ← sbatch wrapper, single-box pipeline
 │   ├── run_subboxes.sh           ← sbatch wrapper, subbox pipeline
 │   ├── run_subboxes_cosmo.sh     ← sbatch wrapper taking <cosmo> <hod> arguments
-│   └── launch_fisher_subboxes.sh ← submits all nine Fisher (cosmo, hod) runs
-├── data/             ← pipeline output (.npy / .npz); per-run subdirs {cosmo}_hod{NNN}/
-├── plots/            ← figure output (.png); per-run subdirs {cosmo}_hod{NNN}/
+│   ├── run_fullbox_cosmo.sh      ← same for the full-box pipeline (full CPU node)
+│   ├── launch_fisher_subboxes.sh ← submits all nine Fisher (cosmo, hod) subbox runs
+│   └── launch_fisher_fullbox.sh  ← submits all nine full-box runs
+├── data/             ← pipeline output; subdirs {cosmo}_hod{NNN}/, fullbox/, derivatives/
+├── plots/            ← figure output; mirrors the data/ layout
+├── notes/            ← LaTeX technical notes (zero_crossing/)
 ├── CLAUDE.md
 └── README.md
 ```
@@ -267,3 +275,31 @@ pairs, or measure ∂ξ/∂θ_HOD from extra c000 draws and subtract.
 - If needed, calibrate ∂ξ/∂θ_HOD by running the pipeline on a few *extra
   existing* c000 HOD catalogs (500 draws on disk; no new HOD generation) and
   subtract the contamination explicitly. The σ₈ derivative needs this most.
+
+### Derivatives and first Fisher estimates (2026-06-11, ω_b pair)
+
+Workflow: `python scripts/compute_derivatives.py` (paired per-subbox central
+differences for every complete ± pair → `data/derivatives/derivative_{param}.npz`
++ 2×5-panel figure), then `python scripts/plot_fisher_gaussians.py`
+(one-parameter Fisher per data vector: c000 64-subbox covariance,
+Hartlap-corrected, derivative-noise bias subtracted; Gaussians around the
+fiducial in `plots/derivatives/`). Both auto-detect which pairs exist.
+
+Findings from the ω_b pair (c100−c101):
+
+- The pair difference is a **scale-dependent** −6%…+9% tilt in ξ₀ (S/N≈19
+  at small s) — still HOD-dominated (expected ω_b signal ~1%), and a tilt,
+  not a flat offset, so a constant-amplitude nuisance won't fully absorb it.
+  All σ values below are therefore optimistic; read them as *relative*
+  comparisons between data vectors.
+- Per-vector ranking (ℓ=0+2, per 500 Mpc/h subbox): **full×dataQ3 (σ_lnωb
+  ≈0.0092) beats the full auto (0.0102)**; then full×dataQ4, randQ1 auto,
+  dataQ3/Q4 autos. Underdense random autos carry no usable signal at current
+  derivative precision (noise-bias dominated).
+- The quadrupole adds almost nothing for ω_b; doubling the bins costs more
+  Hartlap penalty than it gains.
+- Concatenating vectors that share the full-sample leg
+  (full ⊕ full×dQ4 ⊕ full×rQ1) is ~a tie with the full auto alone, even
+  after rebinning 15→8 bins per piece to tame Hartlap ((64−nb−2)/63):
+  the pieces are too redundant. More information requires independent
+  tracers in the vector or more covariance samples, not more crosses.
