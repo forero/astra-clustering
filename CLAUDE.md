@@ -163,3 +163,47 @@ quantiles cluster just as overdense galaxies do.
 | `SEED_GEOM` | 1042 | Geometry randoms seed (fixed, `SEED+1000`) |
 | `NTHREADS` | 8 | CPU threads for pycorr / corrfunc |
 | `S_EDGES` | 0–150 Mpc/h, 15 bins | 2PCF s binning |
+
+---
+
+## Fisher-matrix design (decided 2026-06-10)
+
+Goal: Fisher forecast on **{ω_b, ω_c, n_s, σ₈}** from the ASTRA quantile clustering
+statistics, using central differences over the AbacusSummit linear derivative grid
+(all ph000, phase-matched to c000 so cosmic variance cancels in the differences;
+θ\* and σ₈ are held fixed via h and A_s retuning — see
+`data/abacus_cosmologies_params.csv`).
+
+### Cosmologies and chosen HOD catalogs
+
+Catalogs: `/pscratch/sd/n/ntbfin/emulator/hods/z0.5/yuan23_prior/{cXXX}_ph000/seed0/hodNNN.fits`
+
+| Cosmology | Variation | HOD file |
+|-----------|-----------|----------|
+| c000 | fiducial | `hod484` |
+| c100 / c101 | ω_b ±2% | `hod179` / `hod152` |
+| c102 / c103 | ω_c ±3.3% | `hod556` / `hod861` |
+| c104 / c105 | n_s ±0.01 | `hod498` / `hod589` |
+| c112 / c113 | σ₈ ±2% | `hod507` / `hod483` |
+
+### Why these specific HOD files
+
+The emulator catalogs are **not HOD-matched across cosmologies**: each cosmology has
+its own random ~500-subset of a 1177-point HOD Latin hypercube with *different*
+parameter values at the same `hodNNN` index (verified from all 4500 FITS headers —
+zero exact matches). No new HOD catalogs will be generated. The files above were
+selected by minimising the HOD-parameter mismatch within each ± pair around a common
+mid-prior anchor point (within-pair distance ≈ 0.14–0.16 of the prior range vs ≈ 0.40
+for random draws). Galaxy counts are fixed per cosmology by construction, so number
+density is matched automatically.
+
+**Important — fiducial change:** the Fisher fiducial is `c000` `hod484`, **not** the
+`hod000` used by all pipeline results currently in `data/` and `plots/`. `hod000` is
+a prior-edge draw (normalised α≈0.96, logM_cut≈0.95, σ≈0.93) with no nearby draws in
+the other cosmologies; the c000 baseline must be rerun on `hod484` before assembling
+the Fisher matrix.
+
+Residual within-pair HOD mismatch (up to ~0.3 of the prior range in single parameters,
+e.g. B_cen for the ω_b pair) can contaminate derivatives at a level comparable to the
+cosmology signal. Mitigations if a derivative looks suspect: average the top-K matched
+pairs, or measure ∂ξ/∂θ_HOD from extra c000 draws and subtract.
