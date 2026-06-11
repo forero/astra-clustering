@@ -159,7 +159,51 @@ def plot_param(param, der_file):
         print(f'  {name:18s} sigma({param}) = {sig:.5g}  (noise {noise:.0%})')
 
 
+def vector_samples(pieces):
+    """(64, nb) subbox samples of a data vector, plus block sizes."""
+    parts, blocks = [], []
+    for stem, ells, k in pieces:
+        c0 = np.load(DATA_DIR / FID_TAG / f'subbox_multipoles_{stem}.npz')
+        for ell in ells:
+            arr = rebin(c0[f'xi{ell}_all'], k)
+            parts.append(arr)
+            blocks.append(arr.shape[1])
+    return np.hstack(parts), blocks
+
+
+def plot_covariances():
+    """Correlation matrices of every data vector in the comparison."""
+    fig, axes = plt.subplots(1, len(VECTORS), figsize=(4.2 * len(VECTORS), 4.4))
+    im = None
+    for ax, (name, pieces) in zip(np.atleast_1d(axes), VECTORS):
+        X, blocks = vector_samples(pieces)
+        C   = np.cov(X, rowvar=False)
+        std = np.sqrt(np.diag(C))
+        R   = C / np.outer(std, std)
+        im  = ax.imshow(R, origin='lower', vmin=-1, vmax=1, cmap='RdBu_r')
+        # mark block boundaries of concatenated vectors
+        edge = 0
+        for b in blocks[:-1]:
+            edge += b
+            ax.axhline(edge - 0.5, color='k', lw=0.8)
+            ax.axvline(edge - 0.5, color='k', lw=0.8)
+        ax.set_title(f'{name}\n({X.shape[1]} bins, Hartlap '
+                     f'{(N_SB - X.shape[1] - 2) / (N_SB - 1):.2f})', fontsize=9)
+        ax.set_xlabel('bin index')
+        ax.set_ylabel('bin index')
+    fig.colorbar(im, ax=np.atleast_1d(axes).tolist(), shrink=0.8, pad=0.02,
+                 label='correlation coefficient')
+    fig.suptitle('Correlation matrices of the Fisher data vectors '
+                 f'({N_SB} fiducial subboxes)', y=1.02)
+    PLOT_DIR.mkdir(parents=True, exist_ok=True)
+    path = PLOT_DIR / 'fisher_covariances.png'
+    fig.savefig(path, dpi=150, bbox_inches='tight')
+    plt.close(fig)
+    print(f'Saved {path}')
+
+
 def main():
+    plot_covariances()
     found = False
     for param in PARAMS:
         der_file = DER_DIR / f'derivative_{param}.npz'
