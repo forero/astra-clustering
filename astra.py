@@ -136,6 +136,60 @@ class AstraSplit:
 
         return class_rows
 
+    def classify_fast(self, df):
+        """
+        Vectorised version of classify() for large catalogs (millions of
+        points).  Identical results; avoids the per-point Python loop and
+        dict-of-sets neighbour graph, which do not scale past ~10^6 points.
+
+        1. Delaunay triangulation over all points.
+        2. Expand every tetrahedron into its 6 edges, deduplicate them by
+           encoding (i, j) with i < j into a single int64.
+        3. Count data / random neighbours per point with np.bincount.
+
+        Returns
+        -------
+        df_class : DataFrame with columns TARGETID, RANDITER, ISDATA,
+                   NDATA, NRAND — same content as classify(), as a frame.
+        """
+        coords    = df[['XCART', 'YCART', 'ZCART']].values
+        targetids = df['TARGETID'].values
+        is_data   = (df['RANDITER'] == -1).values
+        n_points  = len(coords)
+
+        if n_points < 4:
+            raise ValueError('Need at least 4 points for Delaunay triangulation.')
+
+        print(f'Delaunay triangulation on {n_points:,} points ...')
+        tri  = Delaunay(coords)
+        simp = tri.simplices                      # (M, 4) int32
+
+        print('Extracting unique edges ...')
+        edges = np.vstack([simp[:, [a, b]] for a, b in combinations(range(4), 2)])
+        i = edges.min(axis=1).astype(np.int64)
+        j = edges.max(axis=1).astype(np.int64)
+        del edges
+        code = np.unique(i * n_points + j)        # dedupe undirected edges
+        del i, j
+        i = code // n_points
+        j = code % n_points
+        del code
+
+        print(f'Counting neighbours over {len(i):,} edges ...')
+        w = is_data.astype(np.float64)
+        ndata = (np.bincount(i, weights=w[j], minlength=n_points) +
+                 np.bincount(j, weights=w[i], minlength=n_points)).astype(np.int64)
+        ntot  = (np.bincount(i, minlength=n_points) +
+                 np.bincount(j, minlength=n_points)).astype(np.int64)
+
+        return pd.DataFrame({
+            'TARGETID': targetids.astype(np.int64),
+            'RANDITER': 0,
+            'ISDATA':   is_data,
+            'NDATA':    ndata,
+            'NRAND':    ntot - ndata,
+        })
+
     # ── quantile assignment ────────────────────────────────────────────────────
 
     def assign_quantiles(self, class_rows, n_quantiles=4):
@@ -148,7 +202,8 @@ class AstraSplit:
 
         Parameters
         ----------
-        class_rows  : output of classify()
+        class_rows  : output of classify() (list of tuples) or
+                      classify_fast() (DataFrame)
         n_quantiles : int
 
         Returns
@@ -157,10 +212,13 @@ class AstraSplit:
              TARGETID, ISDATA_BOOL, r, QUARTILE
              QUARTILE is 1…n_quantiles for both data and randoms.
         """
-        df = pd.DataFrame(
-            class_rows,
-            columns=['TARGETID', 'RANDITER', 'ISDATA', 'NDATA', 'NRAND'],
-        )
+        if isinstance(class_rows, pd.DataFrame):
+            df = class_rows.copy()
+        else:
+            df = pd.DataFrame(
+                class_rows,
+                columns=['TARGETID', 'RANDITER', 'ISDATA', 'NDATA', 'NRAND'],
+            )
         df['ISDATA_BOOL'] = df['ISDATA'].astype(bool)
         df['r'] = np.where(
             (df['NDATA'] + df['NRAND']) > 0,
