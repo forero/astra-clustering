@@ -85,6 +85,23 @@ salloc -N 1 -C cpu -q interactive -t 60:00 -A desi -c 8 --mem=32G
 Increase `-t` if needed — with N_ASTRA_ITERATIONS=10 the full run takes ~60–90 min
 (each iteration: ~5–10 min Delaunay + ~10 min 2PCF for 16 correlation functions).
 
+### Batch-queue timings (measured on the 2026-06 Fisher runs)
+
+`launch_fisher_subboxes.sh` / `launch_fisher_fullbox.sh` each `sbatch` the
+corresponding run script nine times (one per cosmology), inheriting its limits.
+
+| Run script | `#SBATCH -t` | cores `-c` | actual wall (9 runs) |
+|------------|--------------|-----------|----------------------|
+| `run_subboxes_cosmo.sh` | 4:00:00 | 8 | **3:14–3:28** (~85% of cap) |
+| `run_fullbox_cosmo.sh`  | 8:00:00 | 256 | **0:24–0:27** (3 iterations) |
+
+- The **subbox limit is tight** — ~30–45 min of margin against 4 h. Bump to
+  `-t 5:00:00` on reruns, or raise `-c` (it uses only 8 of the node's 256 cores
+  while `regular` qos charges the whole node anyway).
+- The **full-box limit is hugely over-provisioned** — 8 h requested for ~25-min
+  jobs; `-t 1:00:00` is plenty and schedules faster. Full-box uses all 256 cores,
+  hence ~8× faster than the 8-core subbox runs despite covering the whole box.
+
 ### 2. Load environment and run
 
 ```bash
@@ -303,3 +320,48 @@ Findings from the ω_b pair (c100−c101):
   after rebinning 15→8 bins per piece to tame Hartlap ((64−nb−2)/63):
   the pieces are too redundant. More information requires independent
   tracers in the vector or more covariance samples, not more crosses.
+
+### Full 4-parameter grid complete (2026-06-16)
+
+All nine (cosmo, hod) runs are now finished at **both** resolutions (64-subbox
+and full box), and all four derivatives exist:
+`derivative_{lnwb,lnwc,ns,lns8}.npz`. The c100/c101/c102/c103 subboxes were
+re-run under the **AP-rescaled subbox-grid fix** (`pipeline_subboxes_cosmo.py`):
+the grid now tiles the box bounds ±(FULL_SIZE/2)/q per axis rather than a fixed
+±1000 grid, which previously left empty slabs in edge subboxes whenever q > 1
+(e.g. c103: ±985.6 in z) so the LS geometry randoms covered galaxy-free volume.
+`subbox_info.npz` now also stores `box_lo`/`box_hi`.
+
+**Scope of the current Fisher comparison.** `plot_fisher_gaussians.py` now
+compares a fixed set of **four monopole-only (ℓ=0) vectors** — `full auto`,
+`full×data Q4`, `full×rand Q1`, and a rebinned×2 concatenation of the three —
+*not* the earlier exhaustive quantile sweep that found full×dataQ3 best for ω_b.
+σ values are per 500 Mpc/h subbox, Hartlap-corrected, derivative-noise-bias
+subtracted. Read them as relative comparisons (HOD contamination makes the
+absolute numbers optimistic).
+
+Per-vector ranking by parameter (σ, with derivative-noise fraction):
+
+| Param | Best vector | σ (noise) | runner-up | weakest |
+|-------|-------------|-----------|-----------|---------|
+| ω_b (ln) | **full auto** | 0.000213 (1%) | concat 0.000221 | full×randQ1 0.00060 (10%) |
+| ω_c (ln) | **full×data Q4** | 0.000333 (0%) | full auto 0.000334 | full×randQ1 0.00054 |
+| n_s | **concat** | 0.000727 (0%) | full×dataQ4 0.000733 | full×randQ1 0.00120 |
+| σ₈ (ln) | concat | 0.0724 (60%) | full×randQ1 0.0915 | full×dataQ4 0.139 (83%) |
+
+Conclusions:
+
+- **The full-sample auto and the full×data-Q4 cross are the two workhorses**,
+  statistically tied at the top for ω_b, ω_c and n_s (sub-percent σ differences).
+  Either is a fine single-vector choice for the three clean parameters.
+- **full×rand Q1 (underdense random leg) is consistently weakest** (~1.6× worse
+  on ω_c/n_s, ~3× on ω_b) and carries the most derivative noise — little
+  independent signal at current precision.
+- **Concatenating helps only marginally**, and only for n_s and σ₈; for ω_b it
+  is a hair *worse* than the full auto alone. The pieces share the full-sample
+  leg, so the Hartlap penalty roughly cancels the added information — consistent
+  with the ω_b-only finding above.
+- **σ₈ is not yet usable.** Every vector is 60–83% derivative noise, σ(ln σ₈) an
+  order of magnitude looser than the other parameters. This is the HOD-mismatch
+  contamination the design flagged; the σ₈ row needs explicit ∂ξ/∂θ_HOD
+  calibration (extra c000 HOD draws) before its constraints mean anything.
