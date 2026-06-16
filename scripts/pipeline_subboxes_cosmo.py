@@ -81,16 +81,13 @@ OUT_DIR.mkdir(parents=True, exist_ok=True)
 LOG_DIR.mkdir(parents=True, exist_ok=True)
 
 # ── subbox grid ────────────────────────────────────────────────────────────────
-N_SIDE   = int(FULL_SIZE / SUBBOX_SIZE)   # 4
-subboxes = []
-for ix, iy, iz in itertools.product(range(N_SIDE), repeat=3):
-    lo = np.array([
-        -FULL_SIZE / 2 + ix * SUBBOX_SIZE,
-        -FULL_SIZE / 2 + iy * SUBBOX_SIZE,
-        -FULL_SIZE / 2 + iz * SUBBOX_SIZE,
-    ])
-    subboxes.append((ix, iy, iz, lo, lo + SUBBOX_SIZE))
-N_SUBBOXES = len(subboxes)   # 64
+# Built after the catalog is loaded: the AP rescaling divides positions by
+# Q_PERP/Q_PAR, so the box edge sits at ±(FULL_SIZE/2)/q per axis.  The grid
+# must tile that volume exactly — a fixed ±1000 grid leaves empty slabs in
+# the edge subboxes whenever q > 1 (e.g. c103: ±985.6 in z), and the LS
+# geometry randoms would then cover volume that contains no galaxies.
+N_SIDE     = int(FULL_SIZE / SUBBOX_SIZE)   # 4
+N_SUBBOXES = N_SIDE ** 3                    # 64
 
 # ── logging ───────────────────────────────────────────────────────────────────
 stamp    = datetime.now().strftime('%Y%m%d_%H%M%S')
@@ -109,7 +106,8 @@ log.info(f'Log file: {log_file}')
 log.info(f'Cosmology: {COSMO}  HOD: hod{HOD:03d}')
 log.info(f'Input: {HOD_FILE}')
 log.info(f'Output directory: {OUT_DIR}')
-log.info(f'Subbox grid: {N_SIDE}×{N_SIDE}×{N_SIDE} = {N_SUBBOXES} subboxes of {SUBBOX_SIZE:.0f} Mpc/h')
+log.info(f'Subbox grid: {N_SIDE}×{N_SIDE}×{N_SIDE} = {N_SUBBOXES} subboxes '
+         f'of nominally {SUBBOX_SIZE:.0f} Mpc/h (exact size set by AP rescaling)')
 
 # ── timing helper ─────────────────────────────────────────────────────────────
 @contextmanager
@@ -133,6 +131,19 @@ with timer('load HOD'):
         data['Z_RSD']  / q_par,
     ].astype(np.float64)
 log.info(f'  Full box: {len(pos_full):,} galaxies  (Q_PAR={q_par:.6f}, Q_PERP={q_perp:.6f})')
+
+# AP-rescaled box bounds and subbox grid
+half     = FULL_SIZE / 2
+box_lo   = np.array([-half / q_perp, -half / q_perp, -half / q_par])
+box_hi   = -box_lo
+step     = (box_hi - box_lo) / N_SIDE
+subboxes = []
+for ix, iy, iz in itertools.product(range(N_SIDE), repeat=3):
+    lo = box_lo + np.array([ix, iy, iz]) * step
+    subboxes.append((ix, iy, iz, lo, lo + step))
+log.info(f'Subbox grid tiles the AP-rescaled box: '
+         f'x,y in ±{box_hi[0]:.2f}, z in ±{box_hi[2]:.2f} Mpc/h; '
+         f'subbox size {step[0]:.2f} x {step[1]:.2f} x {step[2]:.2f} Mpc/h')
 
 # ── accumulators ──────────────────────────────────────────────────────────────
 all_stems = (
@@ -312,6 +323,8 @@ with timer('save results'):
              seed=SEED,
              seed_geom=SEED_GEOM,
              n_data=np.array(n_data_sb),
+             box_lo=box_lo,
+             box_hi=box_hi,
              ixyz=np.array([(ix, iy, iz) for ix, iy, iz, _, _ in subboxes]),
              s_edges=S_EDGES,
              mu_edges=MU_EDGES)
