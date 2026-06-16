@@ -365,3 +365,36 @@ Conclusions:
   order of magnitude looser than the other parameters. This is the HOD-mismatch
   contamination the design flagged; the σ₈ row needs explicit ∂ξ/∂θ_HOD
   calibration (extra c000 HOD draws) before its constraints mean anything.
+
+### Tier 0 — full-box derivatives fix the σ₈ *noise* (2026-06-16)
+
+`compute_derivatives_fullbox.py` builds the derivative numerator from the
+**phase-matched full-box ± difference** (cosmic variance cancels, ~4M galaxies,
+periodic BC → no open-boundary integral constraint), with a diagonal noise model
+from the N_ITER=3 ASTRA-random iterations. `plot_fisher_fullbox_compare.py` then
+evaluates **both** derivative sources against the same covariance — the 64 c000
+subboxes scaled to full-box volume (C_subbox/64, Hartlap-corrected) — so only the
+derivative numerator/noise differs. Neither needs new compute (full-box data was
+already on disk). Result (full-auto vector, σ at full 2000 Mpc/h volume):
+
+| Param | σ subbox-deriv (noise) | σ full-box-deriv (noise) | gain |
+|-------|------------------------|--------------------------|------|
+| ω_b | 2.67e-5 (1%) | 2.76e-5 (0%) | 0.97× |
+| ω_c | 4.18e-5 (0%) | 4.10e-5 (0%) | 1.02× |
+| n_s | 9.55e-5 (0%) | 9.60e-5 (0%) | 0.99× |
+| **σ₈ (ln)** | **0.0164 (79%)** | **0.00925 (0%)** | **1.78×** |
+
+- **Consistency check passes:** for the three already-clean parameters the two
+  derivative methods agree to ≈3%, confirming they estimate the same dξ/dθ.
+- **σ₈ is the win:** the full-auto σ(σ₈) goes from 0.0164 at 79% derivative noise
+  (unusable) to 0.00925 at ≈0% noise — ~1.8× tighter *and* now trustworthy — from
+  reanalysis alone. The cosmic-variance cancellation in the phase-matched full-box
+  difference removes the noise that dominated the subbox-paired σ₈ derivative.
+- **Caveat 1 — noise model:** the full-box noise is diagonal from only 3
+  iterations and so *under*-states the bias; read "0% noise" as "noise no longer
+  dominant," not exactly zero. (full×rand Q1 for σ₈ goes to F−bias≤0 → NaN: that
+  underdense leg carries no σ₈ signal regardless of method.)
+- **Caveat 2 — bias remains:** Tier 0 fixes derivative *noise*, not the HOD
+  *contamination bias*. The full-box σ₈ difference still contains the c112/c113
+  HOD mismatch, so 0.00925 is noise-clean but possibly biased. The remaining
+  defence is still the Tier-1 ∂ξ/∂θ_HOD calibration from extra c000 draws.
