@@ -2,18 +2,21 @@
 """
 Gaussian visualisation of per-data-vector Fisher uncertainties.
 
-For each parameter with a derivative file in data/derivatives/, computes a
-one-parameter Fisher per data vector (monopole + quadrupole, covariance
-from the 64 c000 fiducial subboxes, Hartlap-corrected, derivative-noise
-bias subtracted) and draws the implied Gaussian likelihoods centred on the
-fiducial parameter value.  Only data vectors whose derivative-noise bias
-is below NOISE_MAX of the Fisher information are shown; the others are not
-measured well enough to plot.
+Uses the **HOD-corrected full-box derivatives** (derivative_hodcorr_{param}.npz,
+from compute_hod_derivatives.py) — the current best estimate, with the Tier-1
+HOD contamination subtracted.  For each parameter and data vector it computes a
+one-parameter Fisher at the full 2000 Mpc/h box volume:
 
-Left panel: one 500 Mpc/h subbox volume.  Right panel: rescaled to the
-full 2000 Mpc/h box (64 subbox volumes, sigma / 8).
+  * covariance from the 64 c000 fiducial subboxes, scaled to full-box volume
+    (C_subbox / 64), Hartlap-corrected;
+  * derivative noise diagonal, from the N_ITER full-box iterations (cosmic
+    variance cancels in the phase-matched ± difference).
+
+Only data vectors whose derivative-noise bias is below NOISE_MAX of the Fisher
+information are shown.  Gaussians are drawn centred on the fiducial parameter.
 
 Output: plots/derivatives/fisher_gaussians_{param}.png
+        plots/derivatives/fisher_covariances.png
 
 Usage (any node):
   python scripts/plot_fisher_gaussians.py
@@ -32,14 +35,11 @@ DER_DIR   = DATA_DIR / 'derivatives'
 PLOT_DIR  = REPO_ROOT / 'plots' / 'derivatives'
 
 N_SB      = 64
+VOL_FAC   = N_SB     # full 2000 Mpc/h box = 64 subbox volumes -> covariance / 64
 N_Q       = 4
 NOISE_MAX = 0.10     # max derivative-noise fraction of F to include a vector
 FID_TAG   = 'c000_hod484'
 
-# parameter file tag -> (fiducial value of the *physical* parameter,
-#                        plus/minus values from the derivative cosmologies,
-#                        physical-parameter latex, is_log)
-# sigma(ln x) converts to sigma(x) = x * sigma(ln x).
 PARAMS = {
     'lnwb': dict(fid=0.02237, plus=0.02282, minus=0.02193,
                  label=r'\omega_b', log=True),
@@ -51,19 +51,22 @@ PARAMS = {
                  label=r'\sigma_8', log=True),
 }
 
-# a data vector is a list of (stem, ells, rebin) pieces, concatenated in
-# order; rebin=k averages k adjacent s bins (a fixed linear compression,
-# applied identically to derivative, covariance samples and noise, so the
-# Fisher comparison stays consistent — used to tame the Hartlap penalty
-# of concatenated vectors)
+
 def rebin(arr, k):
     if k == 1:
         return arr
     arr  = np.atleast_2d(arr)
     n    = arr.shape[1]
-    out  = [arr[:, i:i + k].mean(axis=1) for i in range(0, n, k)]
-    out  = np.column_stack(out)
+    out  = np.column_stack([arr[:, i:i + k].mean(axis=1) for i in range(0, n, k)])
     return out[0] if out.shape[0] == 1 else out
+
+
+def rebin_var(v, k):
+    """Diagonal variance of a k-bin average: (1/k^2) sum of the k variances."""
+    if k == 1:
+        return v
+    n = v.shape[0]
+    return np.array([v[i:i + k].sum() / k ** 2 for i in range(0, n, k)])
 
 
 COMBO_REBIN = 2   # 15 bins -> 8 per piece; combo = 24 bins, Hartlap 0.60
@@ -83,22 +86,22 @@ VECTORS = [
 
 
 def fisher_sigma(der, pieces):
-    """(sigma, noise_fraction) for one data vector; None if not measurable."""
-    X_parts, d_parts, Ds_parts = [], [], []
+    """(sigma, noise_fraction) at full-box volume; None if not measurable."""
+    X_parts, d_parts, v_parts = [], [], []
     for stem, ells, k in pieces:
         c0 = np.load(DATA_DIR / FID_TAG / f'subbox_multipoles_{stem}.npz')
         for ell in ells:
             X_parts.append(rebin(c0[f'xi{ell}_all'], k))
             d_parts.append(rebin(der[f'{stem}_dxi{ell}'], k))
-            Ds_parts.append(rebin(der[f'{stem}_dxi{ell}_all'], k))
+            v_parts.append(rebin_var(der[f'{stem}_dxi{ell}_noisevar'], k))
     X  = np.hstack(X_parts)
     d  = np.concatenate(d_parts)
-    Ds = np.hstack(Ds_parts)
+    v  = np.concatenate(v_parts)
     nb   = X.shape[1]
     hart = (N_SB - nb - 2) / (N_SB - 1)
-    Cinv = hart * np.linalg.inv(np.cov(X, rowvar=False))
+    Cinv = hart * VOL_FAC * np.linalg.inv(np.cov(X, rowvar=False))
     F    = d @ Cinv @ d
-    bias = np.trace(Cinv @ (np.cov(Ds, rowvar=False) / N_SB))
+    bias = np.trace(Cinv @ np.diag(v))
     if F <= 0 or F - bias <= 0:
         return None
     return 1.0 / np.sqrt(F - bias), bias / F
@@ -121,34 +124,28 @@ def plot_param(param, der_file):
         return
     results.sort(key=lambda r: r[1])
 
-    fig, axes = plt.subplots(1, 2, figsize=(13, 5), sharey=True)
+    fig, ax = plt.subplots(figsize=(7, 5))
     cmap = plt.get_cmap('viridis')
-    for (ax, scale, title) in zip(
-            axes, [1.0, 8.0],
-            ['one 500 Mpc/h subbox volume',
-             'full 2000 Mpc/h box volume ($\\sigma / 8$)']):
-        width = results[-1][1] / scale * 3.5
-        x = np.linspace(fid - width, fid + width, 800)
-        for k, (name, sig, noise) in enumerate(results):
-            s = sig / scale
-            g = np.exp(-0.5 * ((x - fid) / s) ** 2)
-            color = cmap(k / max(len(results) - 1, 1))
-            ax.plot(x, g, color=color, lw=2,
-                    label=rf'{name}  ($\sigma$={s:.2g}, noise {noise:.0%})')
-        ax.axvline(fid, color='k', lw=0.8, ls='--')
-        for v, lab in ((cfg['plus'], '+ step'), (cfg['minus'], '$-$ step')):
-            if fid - width < v < fid + width:
-                ax.axvline(v, color='grey', lw=0.8, ls=':')
-                ax.text(v, 1.02, lab, ha='center', fontsize=7, color='grey')
-        ax.set_xlabel(rf'${cfg["label"]}$')
-        ax.set_title(title, fontsize=10)
-        ax.legend(fontsize=7, loc='upper left')
-    axes[0].set_ylabel('likelihood (peak-normalised)')
+    width = results[-1][1] * 3.5
+    x = np.linspace(fid - width, fid + width, 800)
+    for k, (name, sig, noise) in enumerate(results):
+        g = np.exp(-0.5 * ((x - fid) / sig) ** 2)
+        color = cmap(k / max(len(results) - 1, 1))
+        ax.plot(x, g, color=color, lw=2,
+                label=rf'{name}  ($\sigma$={sig:.2g}, noise {noise:.0%})')
+    ax.axvline(fid, color='k', lw=0.8, ls='--')
+    for v, lab in ((cfg['plus'], '+ step'), (cfg['minus'], '$-$ step')):
+        if fid - width < v < fid + width:
+            ax.axvline(v, color='grey', lw=0.8, ls=':')
+            ax.text(v, 1.02, lab, ha='center', fontsize=7, color='grey')
+    ax.set_xlabel(rf'${cfg["label"]}$')
+    ax.set_ylabel('likelihood (peak-normalised)')
+    ax.legend(fontsize=8, loc='upper left')
     fig.suptitle(
         rf'Fisher forecasts for ${cfg["label"]}$ per data vector '
-        r'(64-subbox covariance, Hartlap-corrected, '
-        'derivative-noise bias subtracted)',
-        y=1.02)
+        r'(HOD-corrected full-box derivative, full 2000 Mpc/h volume, '
+        'Hartlap-corrected)',
+        y=1.00, fontsize=10)
     fig.tight_layout()
     PLOT_DIR.mkdir(parents=True, exist_ok=True)
     path = PLOT_DIR / f'fisher_gaussians_{param}.png'
@@ -156,7 +153,7 @@ def plot_param(param, der_file):
     plt.close(fig)
     print(f'Saved {path}')
     for name, sig, noise in results:
-        print(f'  {name:18s} sigma({param}) = {sig:.5g}  (noise {noise:.0%})')
+        print(f'  {name:30s} sigma({param}) = {sig:.5g}  (noise {noise:.0%})')
 
 
 def vector_samples(pieces):
@@ -181,7 +178,6 @@ def plot_covariances():
         std = np.sqrt(np.diag(C))
         R   = C / np.outer(std, std)
         im  = ax.imshow(R, origin='lower', vmin=-1, vmax=1, cmap='RdBu_r')
-        # mark block boundaries of concatenated vectors
         edge = 0
         for b in blocks[:-1]:
             edge += b
@@ -206,14 +202,16 @@ def main():
     plot_covariances()
     found = False
     for param in PARAMS:
-        der_file = DER_DIR / f'derivative_{param}.npz'
+        der_file = DER_DIR / f'derivative_hodcorr_{param}.npz'
         if der_file.is_file():
             plot_param(param, der_file)
             found = True
         else:
-            print(f'Skipping {param}: no {der_file.name}')
+            print(f'Skipping {param}: no {der_file.name} '
+                  '(run compute_hod_derivatives.py)')
     if not found:
-        raise SystemExit('No derivative files found — run compute_derivatives.py first.')
+        raise SystemExit('No HOD-corrected derivative files found — run '
+                         'compute_hod_derivatives.py first.')
 
 
 if __name__ == '__main__':

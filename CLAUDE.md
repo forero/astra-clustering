@@ -453,6 +453,36 @@ just σ₈.
   derivative crosses zero; judge from the curve shapes instead.)
 - **Still a first-order, single-gradient model.** The cosmology-independence and
   local-linearity assumptions remain; treat the corrected derivatives as the best
-  current estimate, not the final word. Next step: feed `derivative_hodcorr_*`
-  into the Fisher forecast (extend `plot_fisher_fullbox_compare.py` /
-  `plot_fisher_gaussians.py`) to quantify the impact on σ(θ).
+  current estimate, not the final word.
+
+### Fisher updated with HOD-corrected derivatives (2026-06-17)
+
+Both Fisher scripts now consume the HOD-corrected full-box derivatives:
+`plot_fisher_fullbox_compare.py` adds a third method (subbox → full-box raw →
+full-box HOD-corrected); `plot_fisher_gaussians.py` now uses
+`derivative_hodcorr_*` at full-box volume (C_subbox/64, diagonal noise).
+Full-auto σ at full 2000 Mpc/h volume:
+
+| Param | full-box raw | HOD-corrected | change |
+|-------|--------------|---------------|--------|
+| ω_b | 2.76e-5 | 2.69e-6 | 10.2× tighter |
+| ω_c | 4.10e-5 | 4.94e-5 | 0.83× (looser) |
+| n_s | 9.60e-5 | 1.43e-4 | 0.67× (looser) |
+| σ₈ (ln) | 9.25e-3 | 5.23e-4 | 17.7× tighter |
+
+- **The correction is physically validated.** For σ₈, theory gives ∂ξ/∂ln σ₈ =
+  2ξ. The *raw* full-box derivative is only **11%** of 2ξ (the c112−c113
+  difference was gutted — the HOD mismatch cancelled ~89% of the σ₈ signal); the
+  *corrected* derivative is **136%** of 2ξ — back in the right ballpark. So the
+  dramatic ω_b/σ₈ tightening is the raw σ being artificially **loose** (suppressed
+  derivative), not the corrected σ being spuriously tight.
+- **ω_b and σ₈ raw differences were strongly HOD-suppressed**, so their correction
+  is large; ω_c and n_s were not, so their corrected σ barely moves (slightly
+  looser, a sign the correction is a mild perturbation there).
+- **Critical caveat — these σ hold the HOD parameters FIXED.** They do *not*
+  marginalise over HOD nuisances. The σ₈ derivative is amplitude-like (≈2ξ), hence
+  strongly degenerate with HOD bias/amplitude, so the realistic marginalised σ₈
+  would be **much weaker** than 5e-4 — that number is an optimistic "HOD known
+  exactly" bound. ω_b is BAO-shaped and far less degenerate, so its improvement is
+  more robust. The proper next step is a joint cosmology+HOD Fisher (or projecting
+  out the amplitude mode, as flagged in the design) to get marginalised errors.

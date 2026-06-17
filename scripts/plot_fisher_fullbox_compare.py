@@ -7,13 +7,15 @@ c000 fiducial subboxes, scaled to the full 2000 Mpc/h box volume (C_subbox/64,
 Hartlap-corrected on the sample inverse).  Only the derivative numerator and
 its noise model differ:
 
-  subbox   : derivative_{param}.npz       (mean of 64 paired subbox diffs);
-             noise bias = trace(Cinv @ cov(per-subbox diffs)/N_SB)  — full
-             bin-bin noise covariance.
-  full-box : derivative_fullbox_{param}.npz (one phase-matched 2000-box diff);
-             noise bias = trace(Cinv @ diag(noisevar))  — diagonal noise from
-             the N_ITER ASTRA-random iterations (cosmic variance cancels in the
-             phase-matched difference).
+  subbox          : derivative_{param}.npz        (mean of 64 paired subbox
+                    diffs); noise bias = trace(Cinv @ cov(per-subbox diffs)/N_SB).
+  full-box raw    : derivative_fullbox_{param}.npz (one phase-matched 2000-box
+                    diff); noise bias = trace(Cinv @ diag(noisevar)) — diagonal
+                    noise from the N_ITER iterations (cosmic variance cancels).
+  full-box HOD-corr: derivative_hodcorr_{param}.npz (full-box diff with the
+                    Tier-1 HOD contamination subtracted); same diagonal noise.
+                    This is the current best estimate; absent until
+                    compute_hod_derivatives.py has run.
 
 For each parameter and data vector it prints sigma(theta) at full-box volume
 under both derivatives and the derivative-noise fraction (bias/F), then draws,
@@ -126,52 +128,65 @@ def to_phys(sig_ln, cfg):
     return cfg['fid'] * sig_ln if cfg['log'] else sig_ln
 
 
+METHODS = [   # (label, derivative-file template, sigma fn, colour)
+    ('subbox-paired',     'derivative_{}.npz',          sigma_subbox, '#377eb8'),
+    ('full-box raw',      'derivative_fullbox_{}.npz',   sigma_fullbox, '#e41a1c'),
+    ('full-box HOD-corr', 'derivative_hodcorr_{}.npz',   sigma_fullbox, '#4daf4a'),
+]
+
+
 def main():
     PLOT_DIR.mkdir(parents=True, exist_ok=True)
-    summary = {}   # param -> (sig_sb_fullauto, sig_fb_fullauto)
+    summary = {}   # param -> {method label: sigma (full auto)}
 
     for param, cfg in PARAMS.items():
-        f_sb = DER_DIR / f'derivative_{param}.npz'
-        f_fb = DER_DIR / f'derivative_fullbox_{param}.npz'
-        if not (f_sb.is_file() and f_fb.is_file()):
-            print(f'Skipping {param}: need both {f_sb.name} and {f_fb.name}')
+        ders = {}
+        for lab, tmpl, _, _ in METHODS:
+            f = DER_DIR / tmpl.format(param)
+            if f.is_file():
+                ders[lab] = np.load(f)
+        if 'full-box raw' not in ders:
+            print(f'Skipping {param}: no full-box derivative')
             continue
-        der_sb = np.load(f_sb)
-        der_fb = np.load(f_fb)
 
         print(f'\n=== {param}  (sigma at full 2000 Mpc/h box volume) ===')
-        print(f'  {"vector":14s} {"sigma_subbox":>14s} {"sigma_fullbox":>14s} '
-              f'{"noise_sb":>9s} {"noise_fb":>9s}')
-        rows = []
+        hdr = f'  {"vector":14s}' + ''.join(f'{lab:>20s}' for lab, *_ in METHODS)
+        print(hdr)
+        summary[param] = {}
         for name, pieces in VECTORS:
             Cinv, _ = cov_fullbox(pieces)
-            r_sb = sigma_subbox(der_sb, pieces, Cinv)
-            r_fb = sigma_fullbox(der_fb, pieces, Cinv)
-            s_sb = to_phys(r_sb[0], cfg) if r_sb else np.nan
-            s_fb = to_phys(r_fb[0], cfg) if r_fb else np.nan
-            n_sb = r_sb[1] if r_sb else np.nan
-            n_fb = r_fb[1] if r_fb else np.nan
-            rows.append((name, s_sb, s_fb, n_sb, n_fb))
-            print(f'  {name:14s} {s_sb:14.5g} {s_fb:14.5g} '
-                  f'{n_sb:9.0%} {n_fb:9.0%}')
-            if name == 'full auto':
-                summary[param] = (s_sb, s_fb)
+            cells = f'  {name:14s}'
+            for lab, _, sig_fn, _ in METHODS:
+                if lab not in ders:
+                    cells += f'{"-":>20s}'; continue
+                r = sig_fn(ders[lab], pieces, Cinv)
+                if r is None:
+                    cells += f'{"nan":>20s}'
+                else:
+                    s = to_phys(r[0], cfg)
+                    cells += f'{f"{s:.4g} ({r[1]:.0%})":>20s}'
+                    if name == 'full auto':
+                        summary[param][lab] = s
+            print(cells)
 
-        # per-parameter Gaussian figure for the full-auto vector
+        # per-parameter Gaussian figure for the full-auto vector, all methods
         Cinv, _ = cov_fullbox(VECTORS[0][1])
-        r_sb = sigma_subbox(der_sb, VECTORS[0][1], Cinv)
-        r_fb = sigma_fullbox(der_fb, VECTORS[0][1], Cinv)
-        fid  = cfg['fid']
-        fig, ax = plt.subplots(figsize=(6.5, 4.5))
-        width = max(to_phys(r_sb[0], cfg), to_phys(r_fb[0], cfg)) * 3.5
-        x = np.linspace(fid - width, fid + width, 800)
-        for r, color, lab in ((r_sb, '#377eb8', 'subbox-paired deriv'),
-                              (r_fb, '#e41a1c', 'full-box deriv')):
-            if r is None:
+        fid = cfg['fid']
+        results = []
+        for lab, _, sig_fn, color in METHODS:
+            if lab not in ders:
                 continue
-            s = to_phys(r[0], cfg)
+            r = sig_fn(ders[lab], VECTORS[0][1], Cinv)
+            if r is not None:
+                results.append((lab, to_phys(r[0], cfg), r[1], color))
+        if not results:
+            continue
+        width = max(s for _, s, _, _ in results) * 3.5
+        x = np.linspace(fid - width, fid + width, 800)
+        fig, ax = plt.subplots(figsize=(6.5, 4.5))
+        for lab, s, noise, color in results:
             ax.plot(x, np.exp(-0.5 * ((x - fid) / s) ** 2), color=color, lw=2,
-                    label=rf'{lab}  ($\sigma$={s:.2g}, noise {r[1]:.0%})')
+                    label=rf'{lab}  ($\sigma$={s:.2g}, noise {noise:.0%})')
         ax.axvline(fid, color='k', lw=0.8, ls='--')
         ax.set_xlabel(rf'${cfg["label"]}$')
         ax.set_ylabel('likelihood (peak-normalised)')
@@ -184,22 +199,28 @@ def main():
         plt.close(fig)
         print(f'  Saved {path}')
 
-    # summary bar chart of the improvement factor (full auto)
+    # summary: grouped bar chart of sigma per method, per parameter (full auto)
     if summary:
         params = list(summary)
-        ratio  = [summary[p][0] / summary[p][1] for p in params]
-        fig, ax = plt.subplots(figsize=(6.5, 4))
-        ax.bar(range(len(params)),
-               ratio, color='#4daf4a')
+        labels = [lab for lab, *_ in METHODS]
+        colors = {lab: c for lab, _, _, c in METHODS}
+        fig, ax = plt.subplots(figsize=(8, 4.5))
+        w = 0.27
+        for j, lab in enumerate(labels):
+            vals = [summary[p].get(lab, np.nan) for p in params]
+            # normalise each parameter to its full-box-raw sigma for comparability
+            norm = [summary[p].get('full-box raw', np.nan) for p in params]
+            rel  = [v / n if (v == v and n == n) else np.nan
+                    for v, n in zip(vals, norm)]
+            ax.bar([i + (j - 1) * w for i in range(len(params))], rel, w,
+                   label=lab, color=colors[lab])
         ax.axhline(1, color='k', lw=0.8, ls='--')
         ax.set_xticks(range(len(params)))
         ax.set_xticklabels([f'${PARAMS[p]["label"]}$' for p in params])
-        ax.set_ylabel(r'$\sigma_{\rm subbox}/\sigma_{\rm full\text{-}box}$ '
-                      '(full auto)')
-        ax.set_title('Tier-0 improvement: full-box vs subbox-paired derivative',
+        ax.set_ylabel(r'$\sigma\,/\,\sigma_{\rm full\text{-}box\ raw}$ (full auto)')
+        ax.set_title('Fisher σ per derivative method (full-auto vector)',
                      fontsize=11)
-        for i, r in enumerate(ratio):
-            ax.text(i, r + 0.02, f'{r:.2f}x', ha='center', fontsize=9)
+        ax.legend(fontsize=8)
         fig.tight_layout()
         path = PLOT_DIR / 'fisher_fullbox_compare_summary.png'
         fig.savefig(path, dpi=150, bbox_inches='tight')
