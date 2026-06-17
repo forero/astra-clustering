@@ -43,14 +43,19 @@ astra-clustering/
 │   ├── plot_subboxes_cosmo.py    ← 7 deduplicated figures per (cosmo, hod) subbox run
 │   ├── plot_fullbox_cosmo.py     ← 3 figures per (cosmo, hod) full-box run
 │   ├── compute_derivatives.py    ← central-difference derivatives from completed ± pairs
-│   └── plot_fisher_gaussians.py  ← per-data-vector Fisher σ as Gaussians around fiducial
+│   ├── compute_derivatives_fullbox.py ← Tier-0: derivatives from phase-matched full-box ± diffs
+│   ├── plot_fisher_gaussians.py  ← per-data-vector Fisher σ as Gaussians around fiducial
+│   ├── plot_fisher_fullbox_compare.py ← Tier-0: subbox vs full-box derivative σ comparison
+│   ├── select_hod_calibration.py ← Tier-1: maximin-pick c000 HOD draws for ∂ξ/∂θ_HOD
+│   └── compute_hod_derivatives.py← Tier-1: regress ∂ξ/∂θ_HOD, subtract HOD contamination
 ├── queue/
 │   ├── run_single_box.sh         ← sbatch wrapper, single-box pipeline
 │   ├── run_subboxes.sh           ← sbatch wrapper, subbox pipeline
 │   ├── run_subboxes_cosmo.sh     ← sbatch wrapper taking <cosmo> <hod> arguments
 │   ├── run_fullbox_cosmo.sh      ← same for the full-box pipeline (full CPU node)
 │   ├── launch_fisher_subboxes.sh ← submits all nine Fisher (cosmo, hod) subbox runs
-│   └── launch_fisher_fullbox.sh  ← submits all nine full-box runs
+│   ├── launch_fisher_fullbox.sh  ← submits all nine full-box runs
+│   └── launch_hod_calibration.sh ← Tier-1: submits the selected c000 HOD-calibration full-box runs
 ├── data/             ← pipeline output; subdirs {cosmo}_hod{NNN}/, fullbox/, derivatives/
 ├── plots/            ← figure output; mirrors the data/ layout
 ├── notes/            ← LaTeX technical notes (zero_crossing/)
@@ -398,3 +403,31 @@ already on disk). Result (full-auto vector, σ at full 2000 Mpc/h volume):
   *contamination bias*. The full-box σ₈ difference still contains the c112/c113
   HOD mismatch, so 0.00925 is noise-clean but possibly biased. The remaining
   defence is still the Tier-1 ∂ξ/∂θ_HOD calibration from extra c000 draws.
+
+### Tier 1 — HOD-contamination calibration (set up 2026-06-16)
+
+Subtract the HOD contamination from the full-box derivatives by measuring
+∂ξ/∂θ_HOD on extra existing c000 draws and projecting it onto each pair's HOD
+mismatch. Workflow:
+
+1. `python scripts/select_hod_calibration.py [N]` — reads the 12 varying yuan23
+   HOD parameters (LOGM_CUT, LOGM1, SIGMA, ALPHA, KAPPA, ALPHA_C, ALPHA_S, S,
+   ACENT, ASAT, BCENT, BSAT) from all 500 c000 catalog headers and picks N=50 by
+   maximin sampling seeded on the fiducial hod484 →
+   `data/hod_calibration/{hod_params_c000.csv, hod_selection_c000.txt}`.
+2. `bash queue/launch_hod_calibration.sh` — submits one full-box job per selected
+   draw (skips any already done; 49 new, ~25 min each on a full node).
+3. `python scripts/compute_hod_derivatives.py` — regresses full-box ξ on the
+   standardised HOD params (linear + intercept), evaluates the contamination
+   `[∂ξ/∂θ_HOD]·Δθ_HOD/(2 dθ_cosmo)` per pair, subtracts it →
+   `data/derivatives/derivative_hodcorr_{param}.npz` +
+   `plots/derivatives/hod_contamination_{param}.png`. Needs >13 completed
+   calibration runs (fits 12 params); gates itself otherwise.
+
+Assumptions/caveats: HOD response is taken cosmology-independent to first order
+(gradient from c000, applied to the ± cosmologies' mismatch) and locally linear
+over the prior. The measured ± HOD mismatches are **large** — ω_b pair 0.84
+prior-σ rms (2.3σ in SIGMA), σ₈ pair 0.50σ rms (1.4σ in ALPHA_S) — so even the
+low-*noise* ω_b derivative may carry significant HOD *bias*; the noise diagnostic
+does not catch it. This is why the subtraction matters for every parameter, not
+just σ₈.
