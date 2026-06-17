@@ -511,6 +511,10 @@ marginalised over the *other* cosmology params); marginalised = invert the full
 | n_s | 5.78e-4 | 5.89e-3 | 10.2× | 0.61% |
 | σ₈ (ln) | 3.18e-3 | 9.31e-3 | 2.9× | 1.15% |
 
+- **Corner plot** `fisher_joint_ellipses.png` shows the 4-parameter joint
+  constraints (68%/95% ellipses in physical units), overlaying HOD-fixed (grey)
+  vs HOD-marginalised (blue); the blue ellipses dwarf the grey and their tilts
+  show the cosmology-parameter degeneracies that HOD marginalisation opens up.
 - **Robustness check passes:** the convergence curve (`fisher_joint_convergence.png`)
   shows every parameter plateaus by ~4 marginalised HOD directions and is flat
   through k=12 — the HOD response is effectively low-rank, the prior-controlled

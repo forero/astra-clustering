@@ -31,6 +31,8 @@ Data vector: full-auto monopole + quadrupole (30 bins > 16 params; Hartlap
 
 Output: plots/derivatives/fisher_joint_convergence.png
         plots/derivatives/fisher_joint_marginalisation.png
+        plots/derivatives/fisher_joint_ellipses.png  (4-param corner plot,
+            68%/95% ellipses, HOD-fixed vs HOD-marginalised, physical units)
 
 Usage (any node):
   python scripts/fisher_joint.py
@@ -42,6 +44,7 @@ import numpy as np
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
+from matplotlib.patches import Ellipse
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DATA_DIR  = REPO_ROOT / 'data'
@@ -116,6 +119,73 @@ def to_phys(sig, param):
     return fid * sig if log else sig
 
 
+def to_phys_cov(cov, params):
+    """Covariance in parameter-units -> physical units (ln theta -> theta = J cov J)."""
+    J = np.diag([COSMO[p][0] if COSMO[p][2] else 1.0 for p in params])
+    return J @ cov @ J
+
+
+def _ellipse(ax, mean, cov2, scale, **kw):
+    vals, vecs = np.linalg.eigh(cov2)
+    order = vals.argsort()[::-1]
+    vals, vecs = vals[order], vecs[:, order]
+    ang = np.degrees(np.arctan2(vecs[1, 0], vecs[0, 0]))
+    w, h = 2 * scale * np.sqrt(vals)
+    ax.add_patch(Ellipse(mean, w, h, angle=ang, fill=False, **kw))
+
+
+def plot_ellipses(cov_cond, cov_marg, params):
+    """Corner plot: 68%/95% ellipses, HOD-fixed vs HOD-marginalised, physical units."""
+    n   = len(params)
+    fid = [COSMO[p][0] for p in params]
+    Cc  = to_phys_cov(cov_cond, params)
+    Cm  = to_phys_cov(cov_marg, params)
+    sig = np.sqrt(np.diag(Cm))                 # use the wider (marg) errors for ranges
+    s68, s95 = np.sqrt(2.30), np.sqrt(6.18)    # 2-D confidence scalings
+
+    fig, axes = plt.subplots(n, n, figsize=(2.6 * n, 2.6 * n))
+    for i in range(n):
+        for j in range(n):
+            ax = axes[i, j]
+            if j > i:
+                ax.axis('off'); continue
+            if i == j:
+                x = np.linspace(fid[i] - 4 * sig[i], fid[i] + 4 * sig[i], 400)
+                for C, c, lab in ((Cc, '#999999', 'HOD fixed'),
+                                  (Cm, '#377eb8', 'HOD marginalised')):
+                    s = np.sqrt(C[i, i])
+                    ax.plot(x, np.exp(-0.5 * ((x - fid[i]) / s) ** 2), color=c,
+                            lw=1.8, label=lab)
+                ax.set_yticks([])
+                if i == 0:
+                    ax.legend(fontsize=7, loc='upper right')
+            else:
+                idx = [j, i]
+                for C, c in ((Cc, '#999999'), (Cm, '#377eb8')):
+                    sub = C[np.ix_(idx, idx)]
+                    _ellipse(ax, (fid[j], fid[i]), sub, s95, edgecolor=c, lw=1.0, ls='--')
+                    _ellipse(ax, (fid[j], fid[i]), sub, s68, edgecolor=c, lw=1.8)
+                ax.plot(fid[j], fid[i], 'k+', ms=6)
+                ax.set_xlim(fid[j] - 4 * sig[j], fid[j] + 4 * sig[j])
+                ax.set_ylim(fid[i] - 4 * sig[i], fid[i] + 4 * sig[i])
+            if i == n - 1:
+                ax.set_xlabel(rf'${COSMO[params[j]][1]}$')
+            else:
+                ax.set_xticklabels([])
+            if j == 0 and i > 0:
+                ax.set_ylabel(rf'${COSMO[params[i]][1]}$')
+            elif j == 0:
+                ax.set_ylabel('like.')
+            ax.tick_params(labelsize=7)
+    fig.suptitle('Joint Fisher cosmology constraints (68% solid / 95% dashed): '
+                 'HOD-fixed (grey) vs HOD-marginalised (blue)', y=0.98, fontsize=11)
+    fig.tight_layout(rect=[0, 0, 1, 0.97])
+    path = PLOT_DIR / 'fisher_joint_ellipses.png'
+    fig.savefig(path, dpi=150, bbox_inches='tight')
+    plt.close(fig)
+    print(f'Saved {path}')
+
+
 def main():
     PLOT_DIR.mkdir(parents=True, exist_ok=True)
     Cinv, nb            = covariance_inv()
@@ -129,7 +199,7 @@ def main():
     F_data = D @ Cinv @ D.T
 
     # conditional (HOD fixed): invert the cosmology sub-block only
-    sig_cond, _ = cosmo_block_sigma(F_data[:ncos, :ncos] + 0.0)
+    sig_cond, cov_cond = cosmo_block_sigma(F_data[:ncos, :ncos] + 0.0)
     sig_cond = np.array([sig_cond[i] for i in range(ncos)])
 
     # marginalised: full Fisher + Gaussian HOD prior block
@@ -194,6 +264,8 @@ def main():
     p2 = PLOT_DIR / 'fisher_joint_marginalisation.png'
     fig.savefig(p2, dpi=150, bbox_inches='tight'); plt.close(fig)
     print(f'Saved {p2}')
+
+    plot_ellipses(cov_cond, cov_cos, params)
 
 
 if __name__ == '__main__':
