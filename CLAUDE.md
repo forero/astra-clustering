@@ -404,7 +404,7 @@ already on disk). Result (full-auto vector, σ at full 2000 Mpc/h volume):
   HOD mismatch, so 0.00925 is noise-clean but possibly biased. The remaining
   defence is still the Tier-1 ∂ξ/∂θ_HOD calibration from extra c000 draws.
 
-### Tier 1 — HOD-contamination calibration (set up 2026-06-16)
+### Tier 1 — HOD-contamination calibration (run complete 2026-06-17)
 
 Subtract the HOD contamination from the full-box derivatives by measuring
 ∂ξ/∂θ_HOD on extra existing c000 draws and projecting it onto each pair's HOD
@@ -431,3 +431,28 @@ prior-σ rms (2.3σ in SIGMA), σ₈ pair 0.50σ rms (1.4σ in ALPHA_S) — so e
 low-*noise* ω_b derivative may carry significant HOD *bias*; the noise diagnostic
 does not catch it. This is why the subtraction matters for every parameter, not
 just σ₈.
+
+**Results — all 50 draws complete (2026-06-17).** The 49 jobs finished
+(`COMPLETED`, no failures); the regression now runs on the full maximin set.
+
+- **Fit is well-conditioned:** design-matrix condition number 1.8 (37 dof).
+  The ± pair HOD midpoints sit 2.0–2.9 standardised-σ from the calibration-cloud
+  center, which in 12-D is *inside* the cloud (draws span 2.3–4.0σ, mean 3.45 ≈
+  √12) — i.e. the correction interpolates, it does not extrapolate.
+- **The unphysical sign is gone.** With 50 draws the corrected σ₈ monopole
+  derivative is **positive and declining at small s** — the expected ≈2ξ shape
+  for ∂ξ/∂ln σ₈ — recovering the cosmology signal the HOD contamination had been
+  masking. (The preliminary 21-draw fit gave a *negative* small-s derivative; that
+  was a coverage/stability artefact of an arbitrary first-to-finish subset, not
+  extrapolation, and it resolved once the spanning set completed.)
+- **Contamination is a large, smooth tilt** for every parameter (largest at small
+  s, sign-changing near the BAO/zero-crossing scale). It is comparable to or
+  larger than the raw full-box derivative, confirming the derivatives were heavily
+  HOD-contaminated and that the subtraction is essential. (Do not read the
+  |contamination|/|raw| ratio literally — it is inflated wherever the raw
+  derivative crosses zero; judge from the curve shapes instead.)
+- **Still a first-order, single-gradient model.** The cosmology-independence and
+  local-linearity assumptions remain; treat the corrected derivatives as the best
+  current estimate, not the final word. Next step: feed `derivative_hodcorr_*`
+  into the Fisher forecast (extend `plot_fisher_fullbox_compare.py` /
+  `plot_fisher_gaussians.py`) to quantify the impact on σ(θ).
