@@ -134,6 +134,17 @@ def main():
 
     s, grads, mu, sd = fit_gradient(hods, P)
 
+    # save the HOD gradient + prior widths for the joint cosmology+HOD Fisher.
+    # prior width = std over ALL available c000 draws (a sample of the yuan23
+    # prior), not just the completed calibration subset.
+    P_all = np.array([table[h] for h in table])
+    np.savez(DER_DIR / 'hod_gradient.npz',
+             s=s, names=np.array(names),
+             param_mean=P_all.mean(0), param_std_prior=P_all.std(0),
+             n_draws=len(hods), **grads)
+    print(f'Saved {DER_DIR / "hod_gradient.npz"} '
+          f'({len(names)} params, {len(hods)} draws)')
+
     done = 0
     for param, (tag_p, tag_m, dtheta, label) in PAIRS.items():
         f_fb = DER_DIR / f'derivative_fullbox_{param}.npz'

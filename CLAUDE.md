@@ -47,7 +47,8 @@ astra-clustering/
 │   ├── plot_fisher_gaussians.py  ← per-data-vector Fisher σ as Gaussians around fiducial
 │   ├── plot_fisher_fullbox_compare.py ← Tier-0: subbox vs full-box derivative σ comparison
 │   ├── select_hod_calibration.py ← Tier-1: maximin-pick c000 HOD draws for ∂ξ/∂θ_HOD
-│   └── compute_hod_derivatives.py← Tier-1: regress ∂ξ/∂θ_HOD, subtract HOD contamination
+│   ├── compute_hod_derivatives.py← Tier-1: regress ∂ξ/∂θ_HOD, subtract HOD contamination
+│   └── fisher_joint.py           ← joint cosmology+HOD Fisher, HOD-marginalised errors
 ├── queue/
 │   ├── run_single_box.sh         ← sbatch wrapper, single-box pipeline
 │   ├── run_subboxes.sh           ← sbatch wrapper, subbox pipeline
@@ -486,3 +487,44 @@ Full-auto σ at full 2000 Mpc/h volume:
   exactly" bound. ω_b is BAO-shaped and far less degenerate, so its improvement is
   more robust. The proper next step is a joint cosmology+HOD Fisher (or projecting
   out the amplitude mode, as flagged in the design) to get marginalised errors.
+
+### Joint cosmology+HOD Fisher (2026-06-17)
+
+`scripts/fisher_joint.py` builds one Fisher over {ω_b, ω_c, n_s, σ₈} + the 12
+HOD parameters and marginalises over the HOD nuisances. Cosmology rows =
+`derivative_hodcorr_*` (fixed-HOD cosmology derivative); HOD rows =
+`hod_gradient.npz` (the regression gradient, now saved by
+compute_hod_derivatives.py); covariance = 64 c000 subboxes at full-box volume.
+The poorly-constrained HOD directions are regularised by a **Gaussian yuan23
+prior block** (σ_prior = std of the c000 prior draws) — *not* by PCA truncation,
+which would be an implicit infinite prior and reintroduce the fixed-HOD optimism.
+Data vector: full-auto mono+quad (30 bins > 16 params, Hartlap 0.51).
+
+Conditional = HOD fixed (invert the 4×4 cosmology block of F_data, so it is
+marginalised over the *other* cosmology params); marginalised = invert the full
+16×16 F+prior, take the cosmology block:
+
+| Param | σ_cond (HOD fixed) | σ_marg (HOD marg.) | degrade | σ_marg / fiducial |
+|-------|--------------------|--------------------|---------|-------------------|
+| ω_b | 3.08e-5 | 2.49e-4 | 8.1× | 1.1% |
+| ω_c | 4.88e-4 | 1.01e-3 | 2.1× | 0.85% |
+| n_s | 5.78e-4 | 5.89e-3 | 10.2× | 0.61% |
+| σ₈ (ln) | 3.18e-3 | 9.31e-3 | 2.9× | 1.15% |
+
+- **Robustness check passes:** the convergence curve (`fisher_joint_convergence.png`)
+  shows every parameter plateaus by ~4 marginalised HOD directions and is flat
+  through k=12 — the HOD response is effectively low-rank, the prior-controlled
+  tail is irrelevant, and a k≈5 PCA truncation would give the same answer (PCA as
+  check, not method).
+- **The degradation pattern is not what the amplitude argument alone predicts.**
+  n_s and ω_b degrade most (10×, 8×) — their tight conditional errors overlap the
+  broadband HOD tilt/amplitude directions; ω_c and σ₈ degrade least (2.1×, 2.9×).
+  But in *fractional* terms σ₈ ends up the **weakest** (1.15%), consistent with
+  its amplitude degeneracy — its degradation factor is only moderate because its
+  conditional error was already loose. All four land at ~0.6–1.2% from a single
+  2 Gpc box full-auto 2PCF, which is healthy.
+- **Caveats:** HOD gradient measured at c000 (cosmology-independence assumption —
+  relax via the multi-HOD-per-cosmology runs); single box volume; full-auto only
+  (adding ASTRA quantile vectors could break degeneracies further — the point of
+  ASTRA — at a Hartlap cost); point-estimate derivatives (no derivative-noise or
+  gradient-uncertainty propagation); prior width proxied by the c000 draw spread.
