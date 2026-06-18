@@ -26,6 +26,9 @@ else
     cosmos="$target"
 fi
 
+# names of jobs already queued/running, so a re-run does not duplicate work
+queued=$(squeue --me -h -o "%j")
+
 submitted=0
 skipped=0
 for cosmo in $cosmos; do
@@ -38,12 +41,13 @@ for cosmo in $cosmos; do
     while read -r hod; do
         [[ -z "$hod" ]] && continue
         printf -v hod3 '%03d' "$hod"
-        if [[ -f "data/fullbox/${cosmo}_hod${hod3}/fullbox_info.npz" ]]; then
+        job="astra_fb_${cosmo}_hod${hod3}"
+        if [[ -f "data/fullbox/${cosmo}_hod${hod3}/fullbox_info.npz" ]] \
+           || grep -qx "$job" <<< "$queued"; then
             skipped=$((skipped + 1))
             continue
         fi
-        sbatch -J "astra_fb_${cosmo}_hod${hod3}" \
-               queue/run_fullbox_cosmo.sh "$cosmo" "$hod" "$iters"
+        sbatch -J "$job" queue/run_fullbox_cosmo.sh "$cosmo" "$hod" "$iters"
         submitted=$((submitted + 1))
     done < "$sel"
 done
