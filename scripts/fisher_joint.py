@@ -49,6 +49,16 @@ N_SB    = 64
 VOL_FAC = N_SB              # full 2000 Mpc/h box = 64 subbox volumes
 FID_TAG = 'c000_hod484'
 
+# Covariance source.  With POOL_COV the 500 Mpc/h subbox covariance is estimated
+# from the mean-subtracted subboxes pooled across *all* available cosmologies
+# (9 x 64 = 576 fluctuation samples) instead of c000's 64 alone.  Removing each
+# cosmology's own mean leaves only cosmic-variance fluctuations, which are taken
+# cosmology-independent over this small grid; this lifts the Hartlap nb<64 wall
+# so mono+quad vectors fit at native binning.  Caveat: subboxes tile a single
+# box per cosmology, so they share large-scale modes -- the effective number of
+# independent samples is below 576 (this is already assumed for the 64 too).
+POOL_COV = True
+
 COSMO = {                  # file tag -> (fiducial physical value, label, is_log)
     'lnwb': (0.02237,  r'\omega_b',     True),
     'lnwc': (0.1200,   r'\omega_{cdm}', True),
@@ -56,19 +66,25 @@ COSMO = {                  # file tag -> (fiducial physical value, label, is_log
     'lns8': (0.807952, r'\sigma_8',     True),
 }
 
-# named data vectors: list of (stem, multipoles, rebin_k).  rebin keeps nbins
-# well under 64 (Hartlap (64-nb-2)/63).  Q = quantile (Q1 underdense .. Q4 over).
+# named data vectors: list of (stem, multipoles, rebin_k).  Q = quantile
+# (Q1 underdense .. Q4 overdense).  The mono vs mono+quad pairs keep the *same*
+# monopole binning and simply add the quadrupole, so they isolate what the
+# quadrupole buys -- a comparison only possible once POOL_COV relaxes Hartlap
+# (full+dataQ mono+quad = 80 bins > 64 subboxes, impossible from c000 alone).
 QS = range(1, 5)
 VECTORS = {
     'full auto (mono+quad)':
         [('tpcf_full_data', (0, 2), 1)],                                  # 30 bins
-    'data Q autos (mono, x2)':
+    'data Q autos (mono)':
         [(f'tpcf_data_q{q}', (0,), 2) for q in QS],                       # 32 bins
-    'full x data Q (mono, x2)':
-        [(f'tpcf_cross_full_data_q{q}', (0,), 2) for q in QS],            # 32 bins
-    'full + data Q autos (mono, x2)':
+    'data Q autos (mono+quad)':
+        [(f'tpcf_data_q{q}', (0, 2), 2) for q in QS],                     # 64 bins
+    'full + data Q autos (mono)':
         [('tpcf_full_data', (0,), 2)] +
         [(f'tpcf_data_q{q}', (0,), 2) for q in QS],                       # 40 bins
+    'full + data Q autos (mono+quad)':
+        [('tpcf_full_data', (0, 2), 2)] +
+        [(f'tpcf_data_q{q}', (0, 2), 2) for q in QS],                     # 80 bins
 }
 BASELINE = 'full auto (mono+quad)'
 
@@ -82,32 +98,60 @@ def rebin(arr, k):
     return out[0] if out.shape[0] == 1 else out
 
 
+def cosmo_tags():
+    """All cosmology runs with a subbox covariance on disk (fiducial first)."""
+    tags = sorted(d.name for d in DATA_DIR.glob('c*_hod*')
+                  if (d / 'subbox_multipoles_tpcf_full_data.npz').is_file())
+    return [FID_TAG] + [t for t in tags if t != FID_TAG]
+
+
+def subbox_matrix(tag, pieces):
+    """(N_SB, nb) per-subbox data-vector matrix for one cosmology."""
+    cols = []
+    for stem, ells, k in pieces:
+        z = np.load(DATA_DIR / tag / f'subbox_multipoles_{stem}.npz')
+        for ell in ells:
+            cols.append(rebin(z[f'xi{ell}_all'], k))
+    return np.hstack(cols)
+
+
 def assemble(pieces):
-    """Return Cinv, nb, hartlap, D_cosmo (4,nb), D_hod (12,nb), prior_std (12,)."""
+    """Return Cinv, nb, hartlap, D_cosmo (4,nb), D_hod (12,nb), prior_std (12,), nsamp."""
     g    = np.load(DER_DIR / 'hod_gradient.npz', allow_pickle=True)
     ders = {p: np.load(DER_DIR / f'derivative_hodcorr_{p}.npz') for p in COSMO}
-    Xp, Dh = [], []
+    Dh = []
     Dc = {p: [] for p in COSMO}
     for stem, ells, k in pieces:
-        c0 = np.load(DATA_DIR / FID_TAG / f'subbox_multipoles_{stem}.npz')
         for ell in ells:
-            Xp.append(rebin(c0[f'xi{ell}_all'], k))
             Dh.append(rebin(g[f'{stem}_g{ell}'], k))
             for p in COSMO:
                 Dc[p].append(rebin(ders[p][f'{stem}_dxi{ell}'], k))
-    X    = np.hstack(Xp)
-    nb   = X.shape[1]
-    hart = (N_SB - nb - 2) / (N_SB - 1)
-    Cinv = hart * VOL_FAC * np.linalg.inv(np.cov(X, rowvar=False))
     D_cos = np.array([np.concatenate(Dc[p]) for p in COSMO])
     D_hod = np.hstack(Dh)
-    return Cinv, nb, hart, D_cos, D_hod, g['param_std_prior']
+
+    # ---- covariance of one 500 Mpc/h subbox ----
+    if POOL_COV:
+        tags   = cosmo_tags()
+        blocks = [subbox_matrix(t, pieces) for t in tags]            # each (N_SB, nb)
+        F      = np.vstack([M - M.mean(axis=0) for M in blocks])     # fluctuations
+        nsamp  = F.shape[0]                                          # 9 x 64 = 576
+        dof    = nsamp - len(tags)                                   # per-cosmo means
+        C      = F.T @ F / dof
+    else:
+        X      = subbox_matrix(FID_TAG, pieces)
+        nsamp  = N_SB
+        C      = np.cov(X, rowvar=False)                             # dof = nsamp-1
+
+    nb   = D_hod.shape[1]                                            # number of data bins
+    hart = (nsamp - nb - 2) / (nsamp - 1)                            # Hartlap on precision
+    Cinv = hart * VOL_FAC * np.linalg.inv(C)
+    return Cinv, nb, hart, D_cos, D_hod, g['param_std_prior'], nsamp
 
 
 def fisher(pieces):
     """Conditional and marginalised 4x4 cosmology covariances + the SVD-ordered
     whitened HOD response (for the convergence check)."""
-    Cinv, nb, hart, D_cos, D_hod, sd_pr = assemble(pieces)
+    Cinv, nb, hart, D_cos, D_hod, sd_pr, nsamp = assemble(pieces)
     ncos = len(COSMO)
     D = np.vstack([D_cos, D_hod])
     F_data = D @ Cinv @ D.T
@@ -119,7 +163,7 @@ def fisher(pieces):
     Dw = D_hod * sd_pr[:, None]
     U, _, _ = np.linalg.svd(Dw, full_matrices=False)
     D_psi = U.T @ Dw
-    return dict(nb=nb, hart=hart, Cinv=Cinv, D_cos=D_cos, D_psi=D_psi,
+    return dict(nb=nb, hart=hart, nsamp=nsamp, Cinv=Cinv, D_cos=D_cos, D_psi=D_psi,
                 cov_cond=cov_cond, cov_marg=cov_marg)
 
 
@@ -197,7 +241,10 @@ def main():
     res = {name: fisher(pieces) for name, pieces in VECTORS.items()}
 
     # ---- table: HOD-marginalised sigma per parameter, per data vector ----
-    print('\nHOD-marginalised sigma (physical units) per data vector:')
+    ncov = res[BASELINE]['nsamp']
+    print(f'\nCovariance: {"pooled across all cosmologies" if POOL_COV else "c000 only"}'
+          f' ({ncov} subbox samples).')
+    print('HOD-marginalised sigma (physical units) per data vector:')
     print(f'{"data vector":32s} {"nb":>3s} {"hart":>5s} '
           + ' '.join(f'{COSMO[p][1]:>10s}' for p in params))
     for name in VECTORS:

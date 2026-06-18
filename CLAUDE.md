@@ -557,3 +557,41 @@ marginalised corner plot for all vectors. HOD-marginalised σ (physical units):
 - **Quantile autos alone already beat the full auto** on all four params (not just
   redundant signal). **Crosses (full×Q)** help n_s/ω_c but are a wash on ω_b/σ₈ —
   the autos are the workhorse, consistent with the earlier full-vs-cross findings.
+
+### Pooled covariance unlocks the quadrupole (2026-06-18)
+
+The quadrupole was previously untestable on the quantile vectors: with only the
+64 c000 subboxes, adding ℓ=2 pushed nb past 64 and the Hartlap factor went
+negative. `fisher_joint.py` now estimates the 500 Mpc/h subbox covariance from
+the **mean-subtracted subboxes pooled across all 9 cosmologies** (`POOL_COV=True`):
+each cosmology's own mean is removed so only cosmic-variance fluctuations remain
+(taken cosmology-independent over this grid), giving 9×64 = **576 covariance
+samples** instead of 64. nb=80 vectors now sit at Hartlap 0.86. The VECTORS set
+was changed to mono-vs-mono+quad pairs that share the monopole binning, isolating
+what the quadrupole buys. HOD-marginalised σ (physical units, 576-sample cov):
+
+| Data vector | nb | hart | ω_b | ω_c | n_s | σ₈ |
+|-------------|----|------|-----|-----|-----|----|
+| full auto (mono+quad) | 30 | 0.95 | 2.18e-4 | 9.31e-4 | 5.23e-3 | 8.04e-3 |
+| data Q autos (mono) | 32 | 0.94 | 1.94e-4 | 7.53e-4 | 2.99e-3 | 8.61e-3 |
+| data Q autos (mono+quad) | 64 | 0.89 | 1.46e-4 | 5.51e-4 | 1.81e-3 | 5.45e-3 |
+| full+dataQ autos (mono) | 40 | 0.93 | 1.68e-4 | 5.80e-4 | 2.40e-3 | 6.83e-3 |
+| **full+dataQ autos (mono+quad)** | 80 | 0.86 | **1.14e-4** | **4.47e-4** | **1.55e-3** | **4.60e-3** |
+
+- **The earlier "quadrupole adds almost nothing" was a Hartlap-budget artifact.**
+  At a fixed nb the quad competed with monopole resolution and lost; with the
+  pooled covariance it fits at native binning and **tightens every parameter by
+  ~1.3–1.65×** (data-Q autos: ω_b 1.33×, ω_c 1.37×, n_s 1.65×, σ₈ 1.58×;
+  full+dataQ autos: 1.47×/1.30×/1.55×/1.48×). The quadrupole (RSD) carries real,
+  largely independent information once it isn't crowded out.
+- **Best vector = full + data-Q autos, mono+quad** — ~1.5× tighter on *every*
+  parameter than the previous monopole-only best, from reanalysis alone.
+- **Pooling alone is a mild gain** (~1.1× on the full-auto baseline: Hartlap was
+  already benign there); the real win is that 576 samples make the quadrupole
+  *affordable*.
+- **Caveats:** assumes the subbox covariance is cosmology-independent over the
+  ±2–3% grid (mild); subboxes tile one box per cosmology so they share
+  large-scale modes — the effective independent-sample count is below 576 (this
+  approximation was already implicit in the 64-subbox estimate). Exploiting the
+  50 same-phase c000 HOD runs as a direct empirical HOD covariance (C = C_CV +
+  C_HOD) remains an open, more-honest alternative to the gradient+prior block.
