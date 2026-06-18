@@ -1,27 +1,31 @@
 #!/usr/bin/env python3
 """
-Joint cosmology + HOD Fisher with proper HOD marginalisation, for several
-data vectors.
+Joint cosmology + HOD Fisher with proper HOD marginalisation, over a systematic
+set of data vectors spanning {ℓ=0, ℓ=2} × {data, random} × {full, quantile
+autos, full×quantile crosses}.
 
 Builds one Fisher over {ω_b, ω_c, n_s, σ₈} *and* the 12 yuan23 HOD parameters,
-then marginalises over the HOD nuisances, and repeats for a set of data vectors
-so the HOD-marginalised cosmology constraints can be compared:
+then marginalises over the HOD nuisances, and repeats per data vector so the
+HOD-marginalised cosmology constraints can be compared:
 
   F = D Cᵀ⁻¹ D  +  F_prior,
-  D = [ ∂ξ/∂θ_cosmo (4 rows, derivative_hodcorr_* = fixed-HOD cosmology deriv) ;
-        ∂ξ/∂θ_HOD   (12 rows, hod_gradient.npz) ],
+  D = [ ∂ξ/∂θ_cosmo (4 rows) ;  ∂ξ/∂θ_HOD (12 rows) ],
   F_prior = diag(0₄ , 1/σ_prior²)   — Gaussian yuan23 prior on the HOD rows.
 
-Per data vector and cosmology parameter:
-  * conditional sigma — invert the 4×4 cosmology sub-block of F_data (HOD fixed);
-  * marginalised sigma — invert the full (4+12) F+prior, read the cosmology block.
+Derivative source (auto-selected): the **global response model**
+(derivative_global_* + hod_gradient_global.npz from compute_response_global.py)
+if present — cosmology derivatives that are HOD-clean by construction — else the
+finite-difference fallback (derivative_hodcorr_* + hod_gradient.npz).
 
-The HOD prior — not PCA truncation — regularises the poorly-constrained HOD
-directions.  The data vectors include the ASTRA environment splits (quantile
-autos and crosses), the physical motivation being that under/overdense quantiles
-respond differently to σ₈ vs the HOD and so may break degeneracies the full-auto
-2PCF cannot.  Covariance from the 64 c000 subboxes at full-box volume; vectors
-are rebinned where needed to keep nbins well below 64 (Hartlap sane).
+Two HOD-marginalisation routes are reported per vector and should broadly agree:
+  (a) joint 16-parameter Fisher with the yuan23 prior (invert F+prior, 4×4 block);
+  (b) C_total = C_CV + C_HOD, 4 cosmology parameters only, where C_HOD is the
+      empirical HOD covariance from the same-phase c000 ensemble
+      (compute_hod_covariance.py) — a prior-free, fully-nonlinear marginalisation.
+
+Conditional (HOD-fixed) sigma = invert the 4×4 cosmology block of F_data.
+Covariance C_CV from the subboxes at full-box volume (POOL_COV pools all nine
+cosmologies → 576 samples); vectors are rebinned to keep Hartlap sane.
 
 Output: plots/derivatives/fisher_joint_convergence.png       (baseline vector)
         plots/derivatives/fisher_joint_marginalisation.png    (baseline vector)
@@ -66,25 +70,36 @@ COSMO = {                  # file tag -> (fiducial physical value, label, is_log
     'lns8': (0.807952, r'\sigma_8',     True),
 }
 
-# named data vectors: list of (stem, multipoles, rebin_k).  Q = quantile
-# (Q1 underdense .. Q4 overdense).  The mono vs mono+quad pairs keep the *same*
-# monopole binning and simply add the quadrupole, so they isolate what the
-# quadrupole buys -- a comparison only possible once POOL_COV relaxes Hartlap
-# (full+dataQ mono+quad = 80 bins > 64 subboxes, impossible from c000 alone).
+# data-vector building blocks.  pieces are (stem, multipoles, rebin_k); Q =
+# quantile (Q1 underdense .. Q4 overdense), pop in {'data','rand'}.
 QS = range(1, 5)
+M, MQ = (0,), (0, 2)                                  # mono / mono+quad
+
+
+def full(ells, k):
+    return [('tpcf_full_data', ells, k)]
+
+
+def autos(pop, ells, k):                              # quantile autocorrelations
+    return [(f'tpcf_{pop}_q{q}', ells, k) for q in QS]
+
+
+def crosses(pop, ells, k):                            # full × quantile crosses
+    return [(f'tpcf_cross_full_{pop}_q{q}', ells, k) for q in QS]
+
+
+# systematic comparison set: data vs random, monopole vs +quadrupole.  rebin x2
+# on the quantile pieces keeps nbins well under the 576 pooled covariance samples
+# (the workhorse vector reaches nb=144, Hartlap ~0.75).
 VECTORS = {
-    'full auto (mono+quad)':
-        [('tpcf_full_data', (0, 2), 1)],                                  # 30 bins
-    'data Q autos (mono)':
-        [(f'tpcf_data_q{q}', (0,), 2) for q in QS],                       # 32 bins
-    'data Q autos (mono+quad)':
-        [(f'tpcf_data_q{q}', (0, 2), 2) for q in QS],                     # 64 bins
-    'full + data Q autos (mono)':
-        [('tpcf_full_data', (0,), 2)] +
-        [(f'tpcf_data_q{q}', (0,), 2) for q in QS],                       # 40 bins
-    'full + data Q autos (mono+quad)':
-        [('tpcf_full_data', (0, 2), 2)] +
-        [(f'tpcf_data_q{q}', (0, 2), 2) for q in QS],                     # 80 bins
+    'full auto (mono+quad)':              full(MQ, 1),                         # 30
+    'data Q autos (mono)':                autos('data', M, 2),                 # 32
+    'data Q autos (mono+quad)':           autos('data', MQ, 2),               # 64
+    'rand Q autos (mono+quad)':           autos('rand', MQ, 2),               # 64
+    'data+rand Q autos (mono+quad)':      autos('data', MQ, 2)
+                                          + autos('rand', MQ, 2),             # 128
+    'full+data+rand Q autos (mono+quad)': full(MQ, 2) + autos('data', MQ, 2)
+                                          + autos('rand', MQ, 2),             # 144
 }
 BASELINE = 'full auto (mono+quad)'
 
@@ -98,11 +113,28 @@ def rebin(arr, k):
     return out[0] if out.shape[0] == 1 else out
 
 
+def deriv_source():
+    """Prefer the global response model; fall back to the FD (hodcorr) path."""
+    if ((DER_DIR / 'hod_gradient_global.npz').is_file() and
+            all((DER_DIR / f'derivative_global_{p}.npz').is_file() for p in COSMO)):
+        return 'global response model', 'derivative_global_{p}.npz', 'hod_gradient_global.npz'
+    return 'finite-difference (hodcorr)', 'derivative_hodcorr_{p}.npz', 'hod_gradient.npz'
+
+
 def cosmo_tags():
     """All cosmology runs with a subbox covariance on disk (fiducial first)."""
     tags = sorted(d.name for d in DATA_DIR.glob('c*_hod*')
                   if (d / 'subbox_multipoles_tpcf_full_data.npz').is_file())
     return [FID_TAG] + [t for t in tags if t != FID_TAG]
+
+
+def hod_cov_matrix(pieces):
+    """Full-box C_HOD for `pieces` from the same-phase c000 HOD ensemble."""
+    z = np.load(DER_DIR / 'hod_covariance.npz')
+    cols = [rebin(z[f'{stem}_xi{ell}'], k)
+            for stem, ells, k in pieces for ell in ells]
+    X = np.hstack(cols)                                  # (n_draws, nb)
+    return np.cov(X, rowvar=False), X.shape[0]
 
 
 def subbox_matrix(tag, pieces):
@@ -116,9 +148,10 @@ def subbox_matrix(tag, pieces):
 
 
 def assemble(pieces):
-    """Return Cinv, nb, hartlap, D_cosmo (4,nb), D_hod (12,nb), prior_std (12,), nsamp."""
-    g    = np.load(DER_DIR / 'hod_gradient.npz', allow_pickle=True)
-    ders = {p: np.load(DER_DIR / f'derivative_hodcorr_{p}.npz') for p in COSMO}
+    """Derivatives, covariance and bookkeeping for one data vector (a dict)."""
+    _, der_fmt, grad_file = deriv_source()
+    g    = np.load(DER_DIR / grad_file, allow_pickle=True)
+    ders = {p: np.load(DER_DIR / der_fmt.format(p=p)) for p in COSMO}
     Dh = []
     Dc = {p: [] for p in COSMO}
     for stem, ells, k in pieces:
@@ -133,7 +166,7 @@ def assemble(pieces):
     if POOL_COV:
         tags   = cosmo_tags()
         blocks = [subbox_matrix(t, pieces) for t in tags]            # each (N_SB, nb)
-        F      = np.vstack([M - M.mean(axis=0) for M in blocks])     # fluctuations
+        F      = np.vstack([Mb - Mb.mean(axis=0) for Mb in blocks])  # fluctuations
         nsamp  = F.shape[0]                                          # 9 x 64 = 576
         dof    = nsamp - len(tags)                                   # per-cosmo means
         C      = F.T @ F / dof
@@ -145,26 +178,37 @@ def assemble(pieces):
     nb   = D_hod.shape[1]                                            # number of data bins
     hart = (nsamp - nb - 2) / (nsamp - 1)                            # Hartlap on precision
     Cinv = hart * VOL_FAC * np.linalg.inv(C)
-    return Cinv, nb, hart, D_cos, D_hod, g['param_std_prior'], nsamp
+    return dict(Cinv=Cinv, nb=nb, hart=hart, nsamp=nsamp, D_cos=D_cos, D_hod=D_hod,
+                sd_pr=g['param_std_prior'], C_cv_full=C / VOL_FAC)
 
 
 def fisher(pieces):
     """Conditional and marginalised 4x4 cosmology covariances + the SVD-ordered
     whitened HOD response (for the convergence check)."""
-    Cinv, nb, hart, D_cos, D_hod, sd_pr, nsamp = assemble(pieces)
+    a = assemble(pieces)
+    Cinv, D_cos, D_hod, sd_pr = a['Cinv'], a['D_cos'], a['D_hod'], a['sd_pr']
     ncos = len(COSMO)
     D = np.vstack([D_cos, D_hod])
     F_data = D @ Cinv @ D.T
     cov_cond = np.linalg.inv(F_data[:ncos, :ncos])
+    # route (a): joint 16-parameter Fisher + yuan23 prior
     F_prior = np.zeros_like(F_data)
     F_prior[ncos:, ncos:] = np.diag(1.0 / sd_pr ** 2)
     cov_marg = np.linalg.inv(F_data + F_prior)[:ncos, :ncos]
+    # route (b): C_total = C_CV + C_HOD, 4 cosmology parameters only
+    cov_marg2 = None
+    if (DER_DIR / 'hod_covariance.npz').is_file():
+        Ch, _  = hod_cov_matrix(pieces)
+        Ctot   = a['C_cv_full'] + Ch
+        F2     = a['hart'] * (D_cos @ np.linalg.inv(Ctot) @ D_cos.T)
+        cov_marg2 = np.linalg.inv(F2)
     # whitened, SVD-ordered HOD responses for the k-direction convergence test
     Dw = D_hod * sd_pr[:, None]
     U, _, _ = np.linalg.svd(Dw, full_matrices=False)
     D_psi = U.T @ Dw
-    return dict(nb=nb, hart=hart, nsamp=nsamp, Cinv=Cinv, D_cos=D_cos, D_psi=D_psi,
-                cov_cond=cov_cond, cov_marg=cov_marg)
+    return dict(nb=a['nb'], hart=a['hart'], nsamp=a['nsamp'], Cinv=Cinv,
+                D_cos=D_cos, D_psi=D_psi, cov_cond=cov_cond,
+                cov_marg=cov_marg, cov_marg2=cov_marg2)
 
 
 def to_phys(sig, param):
@@ -241,20 +285,36 @@ def main():
     res = {name: fisher(pieces) for name, pieces in VECTORS.items()}
 
     # ---- table: HOD-marginalised sigma per parameter, per data vector ----
+    W = 36
+    src = deriv_source()[0]
     ncov = res[BASELINE]['nsamp']
-    print(f'\nCovariance: {"pooled across all cosmologies" if POOL_COV else "c000 only"}'
+    print(f'\nDerivatives: {src}.')
+    print(f'Covariance: {"pooled across all cosmologies" if POOL_COV else "c000 only"}'
           f' ({ncov} subbox samples).')
+    print('\nRoute (a) — joint 16-param Fisher + yuan23 prior.')
     print('HOD-marginalised sigma (physical units) per data vector:')
-    print(f'{"data vector":32s} {"nb":>3s} {"hart":>5s} '
+    print(f'{"data vector":{W}s} {"nb":>3s} {"hart":>5s} '
           + ' '.join(f'{COSMO[p][1]:>10s}' for p in params))
     for name in VECTORS:
         r = res[name]
         cells = ' '.join(f'{to_phys(np.sqrt(r["cov_marg"][i, i]), p):>10.3g}'
                          for i, p in enumerate(params))
-        print(f'{name:32s} {r["nb"]:3d} {r["hart"]:5.2f} {cells}')
+        print(f'{name:{W}s} {r["nb"]:3d} {r["hart"]:5.2f} {cells}')
+
+    if res[BASELINE]['cov_marg2'] is not None:
+        print('\nRoute (b) — C_total = C_CV + C_HOD, 4 cosmology params '
+              '(prior-free cross-check):')
+        print(f'{"data vector":{W}s} {"nb":>3s} {"hart":>5s} '
+              + ' '.join(f'{COSMO[p][1]:>10s}' for p in params))
+        for name in VECTORS:
+            r = res[name]
+            cells = ' '.join(f'{to_phys(np.sqrt(r["cov_marg2"][i, i]), p):>10.3g}'
+                             for i, p in enumerate(params))
+            print(f'{name:{W}s} {r["nb"]:3d} {r["hart"]:5.2f} {cells}')
+
     print('\nfor reference, conditional (HOD-fixed) sigma, baseline vector:')
     rb = res[BASELINE]
-    print(f'{BASELINE:32s} {"":3s} {"":5s} '
+    print(f'{BASELINE:{W}s} {"":3s} {"":5s} '
           + ' '.join(f'{to_phys(np.sqrt(rb["cov_cond"][i, i]), p):>10.3g}'
                      for i, p in enumerate(params)))
 

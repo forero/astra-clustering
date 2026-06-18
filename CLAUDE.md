@@ -595,3 +595,58 @@ what the quadrupole buys. HOD-marginalised σ (physical units, 576-sample cov):
   approximation was already implicit in the 64-subbox estimate). Exploiting the
   50 same-phase c000 HOD runs as a direct empirical HOD covariance (C = C_CV +
   C_HOD) remains an open, more-honest alternative to the gradient+prior block.
+
+### Global response model — clean derivatives + systematic vectors (2026-06-18)
+
+**Decision:** exploit the **500 existing HOD draws per cosmology** (all 9 Fisher
+cosmologies, same yuan23 prior, ph000) rather than the single mismatched catalog
+per cosmology. Running ~50 maximin draws per cosmology and fitting one **global
+linear response** ξ(θ) ≈ ξ₀ + Σ a_p θ_cosmo,p + Σ b_q θ_HOD,q across all runs
+gives cosmology derivatives that are **HOD-clean by construction** (the HOD term
+absorbs the cross-cosmology HOD mismatch) plus the HOD gradient, in one fit. All
+runs share ph000 so cosmic variance cancels in the cosmology coefficients.
+
+**This supersedes the Tier-0/Tier-1 derivative path** (`compute_derivatives_fullbox.py`
++ `compute_hod_derivatives.py` → `derivative_hodcorr_*`), which is demoted to a
+finite-difference cross-check. The Tier-0/Tier-1 sections above are kept for
+history; the contamination-*subtraction* is no longer the method.
+
+New/changed pipeline:
+- `scripts/select_hod_ensemble.py` — maximin-pick 50 HOD draws per cosmology
+  (seeded on each cosmology's existing Fisher pick so prior runs are reused; the
+  c000 set is identical to the old calibration list) → `data/hod_ensemble/`.
+- `queue/launch_hod_ensemble.sh [cosmo|all] [iters]` — submit full-box runs for
+  the selection, skipping completed ones.
+- `scripts/compute_response_global.py` — the global regression →
+  `derivative_global_{param}.npz` (drop-in for `derivative_hodcorr_*`) +
+  `hod_gradient_global.npz`; prints condition number, σ₈ sanity (∂ξ/∂lnσ₈≈2ξ),
+  and a global-vs-FD figure per parameter.
+- `scripts/compute_hod_covariance.py` — empirical `C_HOD` from the same-phase
+  c000 ensemble → `hod_covariance.npz`.
+- `scripts/fisher_joint.py` — auto-selects the global derivatives; VECTORS now
+  span {ℓ0, ℓ2} × {data, random} × {full, Q autos, full×Q}; reports **two
+  marginalisation routes**: (a) joint 16-param + yuan23 prior, (b)
+  C_total = C_CV + C_HOD (4 params, prior-free cross-check).
+
+**Smoke test on the 58 runs already on disk** (50 c000 + 1 each other cosmology;
+the ± cosmologies still single-HOD until the campaign fills in). Design-matrix
+condition number **1.89**; ∂ξ/∂lnσ₈ vs 2ξ ratio 0.68 (order-unity, will tighten).
+HOD-marginalised σ, route (a) / route (b):
+
+| Data vector | nb | hart | ω_b | ω_c | n_s | σ₈ |
+|-------------|----|------|-----|-----|-----|----|
+| full auto (mono+quad) | 30 | 0.95 | 2.1e-4 / 2.6e-4 | 9.7e-4 / 1.4e-3 | 5.3e-3 / 6.8e-3 | 8.2e-3 / 1.0e-2 |
+| data Q autos (mono+quad) | 64 | 0.89 | 1.5e-4 / 1.9e-4 | 5.6e-4 / 9.4e-4 | 1.8e-3 / 3.1e-3 | 5.4e-3 / 5.9e-3 |
+| rand Q autos (mono+quad) | 64 | 0.89 | 1.4e-4 / 1.5e-4 | 5.8e-4 / 7.6e-4 | 2.1e-3 / 3.1e-3 | 6.3e-3 / 7.2e-3 |
+| data+rand Q autos (mono+quad) | 128 | 0.78 | 8.6e-5 / 1.1e-4 | 3.1e-4 / 5.0e-4 | 1.1e-3 / 2.0e-3 | 4.1e-3 / 4.7e-3 |
+| **full+data+rand Q autos (mono+quad)** | 144 | 0.75 | **6.9e-5 / 9.9e-5** | **2.7e-4 / 4.3e-4** | **9.8e-4 / 1.8e-3** | **3.7e-3 / 4.3e-3** |
+
+- **The two routes broadly agree** (~1.3–1.6×; route b looser — prior-free, and
+  C_HOD is from only 50 draws), validating the marginalisation.
+- **Adding the random quantiles and the quadrupole both help**, consistent with
+  the pre-redesign single-vector tests: the workhorse data+random Q-autos
+  mono+quad vector is the tightest on every parameter.
+- **Status:** the analysis runs on partial data and improves as the per-cosmology
+  ensembles fill in (the ± cosmologies are still single-HOD in this smoke test, so
+  the σ₈ sanity ratio is 0.68 not ~1). Budget: 50 draws/cosmology (~392 new runs)
+  via `launch_hod_ensemble.sh`; scripts ingest more draws later with no change.
