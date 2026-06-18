@@ -532,3 +532,28 @@ marginalised over the *other* cosmology params); marginalised = invert the full
   (adding ASTRA quantile vectors could break degeneracies further — the point of
   ASTRA — at a Hartlap cost); point-estimate derivatives (no derivative-noise or
   gradient-uncertainty propagation); prior width proxied by the c000 draw spread.
+
+### ASTRA quantile vectors break HOD degeneracies (2026-06-18)
+
+`fisher_joint.py` now runs the joint HOD-marginalised Fisher over a *set* of data
+vectors (helpers `assemble`/`fisher`/`corner`; quantile pieces rebinned ×2 to keep
+Hartlap sane), so the ASTRA environment splits can be compared against the
+full-auto baseline. New figure `fisher_joint_ellipses_vectors.png` overlays the
+marginalised corner plot for all vectors. HOD-marginalised σ (physical units):
+
+| Data vector | nb | Hartlap | ω_b | ω_c | n_s | σ₈ |
+|-------------|----|---------|-----|-----|-----|----|
+| full auto (mono+quad) — baseline | 30 | 0.51 | 2.49e-4 | 1.01e-3 | 5.89e-3 | 9.31e-3 |
+| data Q autos (mono, ×2) | 32 | 0.48 | 2.13e-4 | 8.32e-4 | 2.78e-3 | 8.35e-3 |
+| full × data Q (mono, ×2) | 32 | 0.48 | 2.56e-4 | 8.30e-4 | 2.57e-3 | 9.63e-3 |
+| **full + data Q autos (mono, ×2)** | 40 | 0.35 | **1.84e-4** | **6.72e-4** | **2.48e-3** | **7.28e-3** |
+
+- **The ASTRA thesis holds in the marginalised regime.** Full sample ⊕ four
+  quantile autos is the best vector and tightens *every* HOD-marginalised
+  cosmology error vs the full auto: **n_s 2.4×**, ω_c 1.5×, ω_b 1.35×, σ₈ 1.28×.
+  Environment splits respond differently to cosmology vs the HOD, breaking
+  degeneracies the full-auto 2PCF cannot — and the gain survives the Hartlap cost
+  (nb 30→40, correction 0.35).
+- **Quantile autos alone already beat the full auto** on all four params (not just
+  redundant signal). **Crosses (full×Q)** help n_s/ω_c but are a wash on ω_b/σ₈ —
+  the autos are the workhorse, consistent with the earlier full-vs-cross findings.
