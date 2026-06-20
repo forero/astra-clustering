@@ -99,14 +99,20 @@ corresponding run script nine times (one per cosmology), inheriting its limits.
 | Run script | `#SBATCH -t` | cores `-c` | actual wall (9 runs) |
 |------------|--------------|-----------|----------------------|
 | `run_subboxes_cosmo.sh` | 4:00:00 | 8 | **3:14–3:28** (~85% of cap) |
-| `run_fullbox_cosmo.sh`  | 8:00:00 | 256 | **0:24–0:27** (3 iterations) |
+| `run_fullbox_cosmo.sh`  | 1:00:00 | 256 | **0:24–0:27** (3 iterations) |
 
 - The **subbox limit is tight** — ~30–45 min of margin against 4 h. Bump to
   `-t 5:00:00` on reruns, or raise `-c` (it uses only 8 of the node's 256 cores
   while `regular` qos charges the whole node anyway).
-- The **full-box limit is hugely over-provisioned** — 8 h requested for ~25-min
-  jobs; `-t 1:00:00` is plenty and schedules faster. Full-box uses all 256 cores,
-  hence ~8× faster than the 8-core subbox runs despite covering the whole box.
+- **Always request < 1 h for full-box runs** (`run_fullbox_cosmo.sh` now sets
+  `-t 1:00:00`). Runtime is ~25 min; the old `-t 8:00:00` was ~20× the real
+  cost and choked Slurm **backfill** — the scheduler can't slot an 8 h job into
+  short gaps, so a multi-hundred-job campaign (e.g. the HOD ensemble) trickled
+  in at ~1 job/h behind higher-priority work instead of bursting. If a campaign
+  is already queued at the old limit, fix the pending jobs in place:
+  `squeue -u forero -h -t PENDING -o "%i" | xargs -I{} scontrol update jobid={} TimeLimit=01:00:00`.
+  Full-box uses all 256 cores, hence ~8× faster than the 8-core subbox runs
+  despite covering the whole box.
 
 ### 2. Load environment and run
 
