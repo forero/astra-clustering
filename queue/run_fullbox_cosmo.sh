@@ -5,13 +5,17 @@
 #SBATCH -N 1
 #SBATCH -c 256
 #SBATCH --mem=0
-#SBATCH -t 8:00:00
+#SBATCH -t 1:00:00
 #SBATCH -o logs/slurm-%j.out
 #SBATCH -e logs/slurm-%j.err
 #SBATCH --open-mode=append
 
 # Full-box pipeline needs a whole CPU node: ~8M-point Delaunay (several GB)
 # and corrfunc pair counting on 128 physical cores.
+# Runtime is ~25 min (24-27 min measured); -t is kept under 1 h so the jobs are
+# eligible for short Slurm backfill windows. Do NOT bump back to 8 h: the
+# over-reservation chokes scheduling and a multi-hundred-job campaign trickles
+# in at ~1 job/h instead of backfilling.
 # Usage: sbatch -J astra_fb_<cosmo>_hod<NNN> queue/run_fullbox_cosmo.sh <cosmo> <hod> [iterations]
 
 cosmo=$1
