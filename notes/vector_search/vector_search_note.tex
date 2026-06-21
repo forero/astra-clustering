@@ -103,6 +103,100 @@ which reuses the assembly and Fisher machinery of
   inherits that unreliability.
 \end{enumerate}
 
+\section{Background: how the covariance and the derivatives are estimated}
+\label{sec:background}
+
+This section explains, in simple terms, the two main ingredients of the Fisher
+matrix in Eq.~\eqref{eq:fisher}: the covariance $C$ (how noisy the measurement is)
+and the derivatives $D$ (how the measurement changes when a parameter changes).
+It is written for a reader who is new to the method.
+
+\subsection*{The simulation boxes}
+
+All our data come from the AbacusSummit simulations.  Each simulation is a cubic
+box with a side of $2000\Mpch$ (about $3$ billion light-years).  Galaxies are
+placed inside the box with an HOD (halo occupation distribution) model, at
+redshift $z=0.5$.  We use nine different cosmologies.  For each cosmology we have
+$50$ galaxy catalogues, each one with different HOD parameters.  So we have
+$9\times50 = 450$ boxes in total.  All boxes use the same random ``phase''
+(called \code{ph000}): they start from the same initial pattern of matter.  This
+matters because, when we compare two boxes, the random differences between them
+(``cosmic variance'') then mostly cancel.
+
+\subsection*{The covariance, from subboxes}
+
+The covariance tells us how much our measurement would change if we measured it
+again in a different patch of the Universe.  Ideally we would use many separate
+big boxes, but big boxes are expensive to simulate.  Instead we cut one full box
+into smaller cubes.  We divide the $2000\Mpch$ box into $4\times4\times4 = 64$
+subboxes, each with a side of $500\Mpch$.  We measure the data vector in every
+subbox.  The scatter among the $64$ subboxes gives an estimate of the covariance
+of one $500\Mpch$ subbox.
+
+One box gives only $64$ subboxes.  That is not many compared with the length of
+our data vector (up to $180$ numbers).  To do better we combine the subboxes from
+all nine cosmologies.  For each cosmology we first subtract its own mean, so that
+only the random fluctuations remain, and then we put all the subboxes together.
+This gives $9\times64 = 576$ samples.  Here we assume the level of noise is about
+the same in every cosmology, which is a good approximation over our small range
+of cosmologies.
+
+Our real measurement uses the full $2000\Mpch$ box, not a small subbox.  A larger
+volume gives a smaller error.  The variance goes down in proportion to the volume,
+so we divide the subbox covariance by $64$ (the number of subboxes in a full box)
+to get the covariance of the full box.
+
+Finally, a covariance estimated from a limited number of samples gives a slightly
+biased result when we invert it.  We correct this with the standard ``Hartlap
+factor'', $(N-n_b-2)/(N-1)$, where $N=576$ is the number of samples and $n_b$ is
+the number of data points.  For the five-stem vector ($n_b=180$) this factor is
+$0.685$.  Using $576$ samples instead of $64$ is exactly what lets us keep the
+quadrupole at full resolution: with only $64$ samples a $180$-point vector could
+not be inverted at all (we would need $N>n_b$).
+
+\subsection*{The derivatives, from a response model}
+
+The Fisher matrix also needs the derivatives: how the data vector changes when we
+change each parameter by a small amount.  We get these from a ``global response
+model''.  We fit one simple straight-line (linear) relation to all $450$ boxes at
+the same time, separately for each bin of the data vector:
+\begin{equation}
+\xi \;=\; \xi_0 \;+\; \sum_p a_p\,\theta_{{\rm cosmo},p}
+                \;+\; \sum_q b_q\,\theta_{{\rm HOD},q},
+\end{equation}
+where the $\theta_{\rm cosmo}$ are the four cosmological parameters and the
+$\theta_{\rm HOD}$ are the twelve HOD parameters.  The slopes $a_p$ are the
+cosmology derivatives; the slopes $b_q$ are the HOD derivatives.  Because the HOD
+terms are fitted at the same time, the cosmology slopes come out ``clean'': they
+are not spoiled by the fact that different cosmologies happen to have different
+HOD values.  And because all boxes share the same phase, cosmic variance cancels
+in the slopes.  This fit is very well behaved on the full grid (its condition
+number is $1.34$).
+
+\subsection*{A more flexible fit: the Gaussian Process}
+
+The straight-line fit assumes the data vector changes in exact proportion to each
+parameter.  The true response is only approximately linear.  To test this we also
+used a Gaussian Process (GP).  A GP is a flexible method that learns a smooth
+curve from data without assuming a straight line; as a bonus, it also gives an
+error bar on every prediction.
+
+We trained one GP for each cosmology.  The input was the twelve HOD parameters and
+the output was the data vector, using that cosmology's $50$ catalogues as training
+points.  The HOD derivative is then the slope of the GP curve at the central HOD
+point.  Two things came out of this test.  First, the HOD response is mildly
+nonlinear: the GP fits the data clearly better than the straight line (it captures
+about $75\%$ of the variation, against about $18\%$ for the line).  Second, only a
+few HOD parameters --- mainly the typical mass of the host halo and its scatter
+--- drive most of the change; the other parameters matter little.
+
+The headline numbers in this note use the simpler linear response model, because
+it is stable and well understood on the full grid.  The GP is a refinement and a
+cross-check; turning it into final derivatives that also carry their own error
+bars is left for future work.  (The same GP idea, applied separately in each
+cosmology and evaluated at one common HOD point, is also how we can build
+``HOD-matched'' derivatives, but that is beyond the scope of this note.)
+
 \section{The random-leg trap}
 \label{sec:caveat}
 
