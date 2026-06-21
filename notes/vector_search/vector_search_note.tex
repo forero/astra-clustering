@@ -154,6 +154,52 @@ $0.685$.  Using $576$ samples instead of $64$ is exactly what lets us keep the
 quadrupole at full resolution: with only $64$ samples a $180$-point vector could
 not be inverted at all (we would need $N>n_b$).
 
+\subsection*{How robust is this covariance?}
+\label{sec:covrobust}
+
+It is fair to ask how much we can trust a covariance built this way.  We checked
+it in three ways, and the short answer is: it is robust enough for
+\emph{comparing} data vectors (the main goal of this note), but the
+\emph{absolute} error bars should be read with some caution.
+
+The reassuring test is a ``jackknife'': we rebuild the covariance nine times,
+each time leaving one cosmology out of the pool ($8\times64 = 512$ samples), and
+recompute the five-stem $\FoM_3$.  The result changes by only about $6\%$ (about
+$2\%$ per parameter).  So the answer does not depend on which cosmologies we pool,
+and because every data vector uses the \emph{same} covariance, their ranking is
+trustworthy.
+
+There are, however, three weaknesses that the jackknife does not see:
+\begin{itemize}
+\item \textbf{The subboxes are not fully independent.}  The $64$ subboxes come
+  from a single box, so they share the largest waves and neighbouring subboxes
+  are correlated.  The true number of independent samples is therefore below
+  $576$.  This means the real Hartlap correction should be a little stronger than
+  the $0.685$ we use, and the ratio of samples to data points (here $576/180
+  \approx 3.2$) is in practice even smaller.  A ratio of only a few is modest:
+  the inverse covariance is somewhat noisy, and indeed the correlation matrix has
+  a large condition number ($\sim\!10^4$), meaning some directions are close to
+  unconstrained.
+\item \textbf{Open boundaries.}  A $500\Mpch$ subbox has open edges and feels
+  large-scale ``super-sample'' modes; the full $2000\Mpch$ box is periodic and
+  does not.  Dividing the subbox covariance by $64$ assumes a simple volume
+  scaling and ignores this difference, so the absolute covariance, especially on
+  large scales, is only approximate.
+\item \textbf{Pooling assumption.}  Pooling across cosmologies assumes the noise
+  is the same for every cosmology.  This is mild over our small parameter range,
+  but it is an assumption.
+\end{itemize}
+
+In short, the \emph{relative} results (which vector wins, by how much) are robust
+to roughly the $6\%$ level; the \emph{absolute} $\sigma$ values should be treated
+as estimates good to perhaps $10$--$20\%$.  The clean way to remove these
+approximations is to estimate the covariance from many \emph{independent} full
+boxes --- for example the $25$ AbacusSummit phases (\code{ph000}--\code{ph024})
+measured as periodic boxes, or a large suite of approximate mock catalogues ---
+which would give many more than $576$ truly independent samples and drop the
+open-boundary problem entirely.  That is the recommended next step before
+quoting absolute error bars.
+
 \subsection*{The derivatives, from a response model}
 
 The Fisher matrix also needs the derivatives: how the data vector changes when we
@@ -693,7 +739,11 @@ with the cumulative $\FoM_3$ at each step.}
   the random-leg artefact is deflated and the random legs can be ranked
   honestly; (ii) use the higher-iteration runs to denoise the random-quantile
   derivatives directly; (iii) revisit the four-parameter FoM once a
-  trustworthy $\sigma_8$ derivative is available.
+  trustworthy $\sigma_8$ derivative is available; (iv) estimate the covariance
+  from many independent full boxes (e.g.\ the 25 AbacusSummit phases) before
+  quoting absolute error bars --- the relative rankings here are robust to the
+  $\sim\!6\%$ level (Sec.~\ref{sec:covrobust}), but the absolute $\sigma$ rely on
+  the subbox approximation.
 \end{enumerate}
 
 All numbers are reproduced by \code{scripts/fisher\_vector\_search.py} (the full
