@@ -493,6 +493,76 @@ errors and re-shapes the degeneracies.}
 \label{fig:step4}
 \end{figure}
 
+\section{Monopole, quadrupole, or both?}
+\label{sec:multipole}
+
+The vectors above use both multipoles; does the quadrupole earn its place?  We
+test this two ways with \code{scripts/fisher\_multipole\_compare.py}: a
+configuration comparison (mono-only, quad-only, mono$+$quad) for both the full
+auto and the five-stem vector, and a greedy ``poll'' that treats each
+(piece, multipole) as one of twelve selectable units and records whether the
+monopole or quadrupole is chosen at each step (Fig.~\ref{fig:multipole}).
+
+\begin{table}[t]
+\centering
+\caption{Multipole configuration comparison, HOD-marginalised.  $\FoM_3$ gain is
+relative to the standard 2PCF (full auto, mono$+$quad).  The quadrupole is weak
+alone but adds substantially when combined, and is the main carrier of $\sigma_8$
+information.}
+\label{tab:multipole}
+\begin{tabular}{llrrr}
+\toprule
+vector & config & $n_b$ & $\FoM_3$ gain & $\sigma(\sigma_8)$ \\
+\midrule
+full auto & mono ($\ell0$)  & 15 & 0.41 & $3.6\times10^{-2}$ \\
+full auto & quad ($\ell2$)  & 15 & 0.12 & $4.0\times10^{-2}$ \\
+full auto & mono$+$quad      & 30 & 1.00 & $1.4\times10^{-2}$ \\
+\midrule
+5-stem    & mono ($\ell0$)  & 90 & 12.1 & $1.2\times10^{-2}$ \\
+5-stem    & quad ($\ell2$)  & 90 &  2.6 & $1.0\times10^{-2}$ \\
+5-stem    & mono$+$quad      & 180 & 43.3 & $5.0\times10^{-3}$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{itemize}
+\item \textbf{The monopole is the workhorse.}  On its own it carries most of the
+  information --- $0.41$ of $1.0$ for the full auto, $12$ of $43$ for the five-stem
+  vector.  The quadrupole alone is weak ($0.12$ and $2.6$).
+\item \textbf{But the quadrupole is not redundant.}  Adding it to the monopole
+  multiplies $\FoM_3$ by $2.4\times$ for the full auto ($0.41\to1.0$) and
+  $3.6\times$ for the five-stem vector ($12\to43$).  Crucially it is the main
+  source of $\sigma_8$ information: mono-only $\sigma(\sigma_8)$ improves
+  $2.4\times$ when the quadrupole is added ($1.2\times10^{-2}\to5.0\times10^{-3}$
+  for the five-stem vector) --- the redshift-space growth signal the isotropic
+  monopole cannot see.
+\item \textbf{The quadrupole matters more for ASTRA than for the 2PCF}
+  ($3.6\times$ vs $2.4\times$): environment-dependent velocity fields give the
+  quantile quadrupoles extra independent RSD information.
+\item \textbf{The greedy poll confirms the hierarchy.}  Of the first six selected
+  (piece, multipole) units, four are monopoles and two are quadrupoles; greedy
+  front-loads the information-dense monopoles but reaches a quantile quadrupole
+  (\code{dQ2}-$\ell2$) as early as step four, so certain quadrupoles carry strong
+  \emph{independent} information.
+\end{itemize}
+
+The verdict is to use mono$+$quad: the monopole is primary, the quadrupole is
+complementary (mostly $\sigma_8$ and $n_s$), and its value is larger in the
+environment splits than in the plain 2PCF.  This refines the earlier impression
+that ``the quadrupole adds almost nothing'' --- that held for $\omega_b$
+specifically and under a Hartlap-limited bin budget; with the pooled covariance
+the quadrupole clearly pays off.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\textwidth]{multipole_compare.png}
+\caption{Left: $\FoM_3$ gain (log scale) for mono-only, quad-only and mono$+$quad,
+for the full auto and the five-stem vector.  Right: greedy poll over the twelve
+(piece, multipole) units; blue bars are monopole picks, red are quadrupole picks,
+with the cumulative $\FoM_3$ at each step.}
+\label{fig:multipole}
+\end{figure}
+
 \section{Conclusions}
 
 \begin{enumerate}
@@ -519,6 +589,11 @@ errors and re-shapes the degeneracies.}
 \item Single vectors do not improve $\sigma_8$ (HOD-amplitude degeneracy,
   unreliable derivative), but the multi-environment combination does so modestly;
   $\FoM_3$ excluding $\sigma_8$ remains the trustworthy score.
+\item \textbf{Use both multipoles.}  The monopole is the workhorse and the
+  quadrupole is weak alone, but adding the quadrupole multiplies $\FoM_3$ by
+  $2.4$--$3.6\times$ and is the dominant source of $\sigma_8$ information; its
+  value is larger for the ASTRA splits than for the plain 2PCF
+  (Sec.~\ref{sec:multipole}).
 \item \textbf{Next steps.}  (i) Propagate the GP emulator derivative variance
   (calibrated with the $\sim\!1.25\times$ inflation measured separately) so
   the random-leg artefact is deflated and the random legs can be ranked
@@ -533,6 +608,7 @@ sweep; ranked table in
 \code{scripts/fisher\_greedy\_chain.py} (the greedy chain), and
 \code{scripts/fisher\_compare\_full\_vs\_5stem.py} (the corner comparison), and
 \code{scripts/fisher\_5stem\_details.py} (the step-by-step anatomy of
-Sec.~\ref{sec:anatomy}).
+Sec.~\ref{sec:anatomy}), and \code{scripts/fisher\_multipole\_compare.py} (the
+monopole/quadrupole study of Sec.~\ref{sec:multipole}).
 
 \end{document}
