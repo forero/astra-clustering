@@ -16,13 +16,14 @@
 # eligible for short Slurm backfill windows. Do NOT bump back to 8 h: the
 # over-reservation chokes scheduling and a multi-hundred-job campaign trickles
 # in at ~1 job/h instead of backfilling.
-# Usage: sbatch -J astra_fb_<cosmo>_hod<NNN> queue/run_fullbox_cosmo.sh <cosmo> <hod> [iterations]
+# Usage: sbatch -J astra_fb_<cosmo>_hod<NNN> queue/run_fullbox_cosmo.sh <cosmo> <hod> [iterations] [outroot]
 
 cosmo=$1
 hod=$2
 iters=${3:-3}
+outroot=${4:-fullbox}
 if [[ -z "$cosmo" || -z "$hod" ]]; then
-    echo "Usage: sbatch queue/run_fullbox_cosmo.sh <cosmo> <hod> [iterations]" >&2
+    echo "Usage: sbatch queue/run_fullbox_cosmo.sh <cosmo> <hod> [iterations] [outroot]" >&2
     exit 1
 fi
 
@@ -31,4 +32,5 @@ source /global/common/software/desi/users/adematti/cosmodesi_environment.sh main
 
 cd /pscratch/sd/f/forero/astra-clustering
 
-srun -n 1 -c 256 python scripts/pipeline_fullbox_cosmo.py "$cosmo" "$hod" --iterations "$iters"
+srun -n 1 -c 256 python scripts/pipeline_fullbox_cosmo.py "$cosmo" "$hod" \
+    --iterations "$iters" --outroot "$outroot"

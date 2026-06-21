@@ -55,6 +55,9 @@ parser.add_argument('cosmo', help='AbacusSummit cosmology, e.g. c100')
 parser.add_argument('hod', type=int, help='HOD index, e.g. 179')
 parser.add_argument('--iterations', type=int, default=3,
                     help='number of ASTRA random realisations (default 3)')
+parser.add_argument('--outroot', default='fullbox',
+                    help="output subdir under data/ (default 'fullbox'); use a "
+                         "separate root for experiments so the main set is untouched")
 args = parser.parse_args()
 
 COSMO = args.cosmo
@@ -66,7 +69,7 @@ HOD_FILE = Path(
     f'/{COSMO}_ph000/seed0/hod{HOD:03d}.fits'
 )
 RUN_TAG            = f'{COSMO}_hod{HOD:03d}'
-OUT_DIR            = REPO_ROOT / 'data' / 'fullbox' / RUN_TAG
+OUT_DIR            = REPO_ROOT / 'data' / args.outroot / RUN_TAG
 LOG_DIR            = REPO_ROOT / 'logs'
 PREFIX             = 'fullbox'
 FULL_SIZE          = 2000.0   # Mpc/h — box side before AP rescaling (-1000 to +1000)
