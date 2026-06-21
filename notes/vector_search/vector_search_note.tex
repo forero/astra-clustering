@@ -35,12 +35,15 @@ the \emph{random}-quantile legs, with apparent gains up to $55\times$; we
 show this is an artefact of unmodelled derivative noise in those
 noise-limited legs (all of the global top~20 carry a random leg), not real
 information.  Among the trustworthy \emph{data}-leg vectors the gains are
-real but modest: adding a single full$\times$data-quantile cross buys
-$\sim\!5\times$ in the three-parameter FoM, and the best clean pair
-(\code{dQ1}$+$\code{xdQ1}, the void data auto and void data cross) reaches
-$\sim\!14\times$, i.e.\ a factor $\sim\!2.4$ on each of
-$\omega_b,\omega_c,n_s$.  We document the method, the artefact diagnosis,
-and the honest ranking.
+real: adding a single full$\times$data-quantile cross buys $\sim\!5\times$ in
+the three-parameter FoM, and a greedy forward selection that spans the four
+density quantiles reaches a five-stem vector
+(\code{full}$+$\code{xdQ1}$+$\code{dQ1}$+$\code{dQ2}$+$\code{xdQ3}$+$\code{dQ4})
+with $\FoM_3 = 43\times$ --- marginalised errors tighter than the standard 2PCF
+by $3.4\times$ ($\omega_b$), $4.1\times$ ($\omega_c$), $3.6\times$ ($n_s$) and
+$2.8\times$ ($\sigma_8$), with clear diminishing returns past four stems.  We
+document the method, the artefact diagnosis, the honest ranking, and the greedy
+chain.
 \end{abstract}
 
 \section{Question and data}
@@ -247,6 +250,111 @@ data-leg vectors (trustworthy); red bars are random-leg vectors (artefact).}
 \label{fig:perparam}
 \end{figure}
 
+\section{Greedy forward selection: how many stems, and which?}
+\label{sec:greedy}
+
+The single- and pair-level results raise the obvious question: if one extreme
+data cross already buys $\sim\!5\times$ and the void auto$+$cross pair buys
+$14\times$, how far does it go?  We answer it with a \emph{greedy forward
+selection} restricted to the eight data-leg stems
+(\code{scripts/fisher\_greedy\_chain.py}).  Starting from the full auto, at each
+step we append the single data-leg stem that most increases $\FoM_3$, keep it,
+and repeat, up to five added stems.  Greedy selection is not guaranteed to find
+the globally optimal subset, but it is the natural way to read off the
+\emph{marginal} value of each successive statistic and to expose redundancy.
+
+\begin{table}[t]
+\centering
+\caption{Greedy chain over the data-leg stems.  ``marg.'' is the multiplicative
+gain in $\FoM_3$ from that one step.  $\sigma$ values are the HOD-marginalised
+errors of the cumulative vector.  The chain visits all four density quantiles by
+step five.}
+\label{tab:greedy}
+\begin{tabular}{cllrrrrr}
+\toprule
+step & add & meaning & $\FoM_3$ & marg. & $\sigma(\omega_b)$ & $\sigma(n_s)$ & $\sigma(\sigma_8)$ \\
+\midrule
+0 & ---          & full auto        &  1.0 & ---  & $5.7\times10^{-4}$ & $1.3\times10^{-2}$ & $1.4\times10^{-2}$ \\
+1 & \code{xdQ1}  & void cross       &  5.1 & 5.1  & $3.3\times10^{-4}$ & $8.3\times10^{-3}$ & $1.0\times10^{-2}$ \\
+2 & \code{dQ1}   & void auto        & 14.0 & 2.7  & $2.8\times10^{-4}$ & $6.0\times10^{-3}$ & $7.5\times10^{-3}$ \\
+3 & \code{dQ2}   & low--mid auto    & 24.7 & 1.8  & $2.3\times10^{-4}$ & $4.3\times10^{-3}$ & $6.8\times10^{-3}$ \\
+4 & \code{xdQ3}  & mid--high cross  & 32.5 & 1.3  & $2.1\times10^{-4}$ & $3.8\times10^{-3}$ & $5.4\times10^{-3}$ \\
+5 & \code{dQ4}   & knot auto        & 43.3 & 1.3  & $1.7\times10^{-4}$ & $3.6\times10^{-3}$ & $5.0\times10^{-3}$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The chain is \code{full}$+$\code{xdQ1}$+$\code{dQ1}$+$\code{dQ2}$+$\code{xdQ3}$+$\code{dQ4}
+(Table~\ref{tab:greedy}, Fig.~\ref{fig:greedy}).  Three things stand out.
+
+\begin{itemize}
+\item \textbf{Strong diminishing returns.}  The per-step gain falls
+  $5.1\to2.7\to1.8\to1.3\to1.3$.  The first two stems carry most of the
+  information ($\FoM_3$ reaches $14$ of the eventual $43$ by step two); beyond
+  step four each new statistic adds only $\sim\!30\%$, while the bin count and
+  Hartlap/redundancy cost keep rising.  A four-stem vector is the practical
+  sweet spot.
+\item \textbf{Gains come from spanning environments, not repetition.}  Greedy
+  does not pile up void statistics; after the void auto$+$cross it reaches for a
+  \emph{different} density bin (\code{dQ2}), then mid--high (\code{xdQ3}), then
+  the knot (\code{dQ4}), touching all four quantiles by step five.  Different
+  environments respond to cosmology and to the HOD in different ways, so each new
+  environment breaks a \emph{complementary} degeneracy; a second statistic from
+  the same environment would be largely redundant.
+\item \textbf{$\sigma_8$ moves only in combination.}  No single vector improved
+  $\sigma_8$ (Sec.~\ref{sec:results}), but the cumulative five-stem vector
+  tightens it $2.8\times$ ($1.4\times10^{-2}\!\to\!5.0\times10^{-3}$).  The
+  multi-environment combination partially lifts the amplitude degeneracy that
+  defeats any one statistic --- though $\sigma_8$ remains the least trustworthy
+  entry because its derivative is unreliable, and $\FoM_3$ (which excludes it)
+  stays our headline score.
+\end{itemize}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\textwidth]{greedy_chain.png}
+\caption{Greedy forward selection over the data legs.  Left: cumulative
+$\FoM_3$ (and $\FoM_4$) gain over the full auto versus the number of ASTRA stems
+added --- the curve flattens after $\sim\!4$ stems.  Right: per-parameter
+$\sigma$ improvement over the full auto.  Labels mark the stem chosen at each
+step.}
+\label{fig:greedy}
+\end{figure}
+
+\subsection*{The five-stem vector versus the 2PCF}
+
+Figure~\ref{fig:corner} is the head-to-head Fisher comparison of the standard
+full-sample 2PCF (\code{tpcf\_full\_data}, mono$+$quad) and the five-stem ASTRA
+vector, both HOD-marginalised, generated by
+\code{scripts/fisher\_compare\_full\_vs\_5stem.py}.  The five-stem $68/95\%$
+contours sit nested well inside the full-auto contours on every panel, with the
+marginalised errors tighter by
+
+\begin{equation}
+\sigma(\omega_b)\ 3.4\times,\quad
+\sigma(\omega_c)\ 4.1\times,\quad
+\sigma(n_s)\ 3.6\times,\quad
+\sigma(\sigma_8)\ 2.8\times,
+\end{equation}
+
+i.e.\ $\FoM_3 = 43\times$.  Crucially the blue ellipses are not merely smaller but
+\emph{rotated} relative to grey: the environment splits change the orientation of
+the parameter degeneracies, which is the geometric signature of genuinely new
+information rather than a uniform rescaling.  The five-stem $95\%$ region is
+inside the full-auto $68\%$ region for most parameter pairs --- a qualitatively
+different constraint from a single $2\Mpch$ box, by reanalysis alone.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.95\textwidth]{fisher_compare_full_vs_5stem.png}
+\caption{HOD-marginalised Fisher constraints: full-auto 2PCF (grey) versus the
+five-stem ASTRA vector
+\code{full}$+$\code{xdQ1}$+$\code{dQ1}$+$\code{dQ2}$+$\code{xdQ3}$+$\code{dQ4}
+(blue), $68\%$ (solid) and $95\%$ (dashed).  The blue contours are both smaller
+and rotated --- ASTRA shrinks and re-orients the cosmology degeneracies.}
+\label{fig:corner}
+\end{figure}
+
 \section{Conclusions}
 
 \begin{enumerate}
@@ -263,8 +371,16 @@ data-leg vectors (trustworthy); red bars are random-leg vectors (artefact).}
   ($\FoM_3$ gain $14$, $\sim\!2.4\times$ per parameter on
   $\omega_b,\omega_c,n_s$).  The gains are pure degeneracy breaking: each
   vector is worse than the full auto alone.
-\item $\sigma_8$ is not improved by any vector, consistent with its
-  HOD-amplitude degeneracy and unreliable derivative.
+\item A \textbf{greedy chain} over the data legs
+  (\code{full}$+$\code{xdQ1}$+$\code{dQ1}$+$\code{dQ2}$+$\code{xdQ3}$+$\code{dQ4})
+  reaches $\FoM_3 = 43\times$ at five stems, tightening the standard-2PCF errors
+  by $3.4$--$4.1\times$ on $\omega_b,\omega_c,n_s$ and $2.8\times$ on $\sigma_8$
+  (Fig.~\ref{fig:corner}).  Returns diminish sharply ($5.1\to2.7\to1.8\to1.3$
+  per step), so $\sim\!4$ stems is the practical optimum, and the gains come from
+  \emph{spanning} the four environments rather than repeating one.
+\item Single vectors do not improve $\sigma_8$ (HOD-amplitude degeneracy,
+  unreliable derivative), but the multi-environment combination does so modestly;
+  $\FoM_3$ excluding $\sigma_8$ remains the trustworthy score.
 \item \textbf{Next steps.}  (i) Propagate the GP emulator derivative variance
   (calibrated with the $\sim\!1.25\times$ inflation measured separately) so
   the random-leg artefact is deflated and the random legs can be ranked
@@ -273,8 +389,10 @@ data-leg vectors (trustworthy); red bars are random-leg vectors (artefact).}
   trustworthy $\sigma_8$ derivative is available.
 \end{enumerate}
 
-All numbers are reproduced by
-\code{python scripts/fisher\_vector\_search.py}; the full ranked table is in
-\code{plots/vector\_search/vector\_search\_results.csv}.
+All numbers are reproduced by \code{scripts/fisher\_vector\_search.py} (the full
+sweep; ranked table in
+\code{plots/vector\_search/vector\_search\_results.csv}),
+\code{scripts/fisher\_greedy\_chain.py} (the greedy chain), and
+\code{scripts/fisher\_compare\_full\_vs\_5stem.py} (the corner comparison).
 
 \end{document}
