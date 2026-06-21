@@ -656,3 +656,59 @@ HOD-marginalised σ, route (a) / route (b):
   ensembles fill in (the ± cosmologies are still single-HOD in this smoke test, so
   the σ₈ sanity ratio is 0.68 not ~1). Budget: 50 draws/cosmology (~392 new runs)
   via `launch_hod_ensemble.sh`; scripts ingest more draws later with no change.
+
+### HOD-response cosmology-independence test (2026-06-21)
+
+`scripts/test_hod_response_cosmo_independence.py` checks the assumption the whole
+global-response design rests on: that ∂ξ/∂θ_HOD is the same in every cosmology. It
+fits the 12-param HOD gradient *separately within* each cosmology that has ≥15
+same-phase draws (intercept + standardised HOD regressors; cosmology params are
+constant within a cosmology) and compares per-cosmology gradients with propagated
+fit errors → `data/derivatives/hod_gradient_percosmo.npz` +
+`plots/derivatives/hod_response_cosmo_independence_ell{0,2}.png`. Auto-detects ready
+cosmologies and prints the axes covered.
+
+- **With c000/c100/c101 at 50 draws each, the ω_b axis passes:** screening χ²/dof =
+  0.32–0.49 (ℓ=0 and ℓ=2), zero bins beyond 2σ — the per-cosmology HOD gradients are
+  statistically indistinguishable. The single-gradient assumption holds where
+  testable. χ²/dof is approximate (s-bins correlated); the "all gradient curves
+  coincide" figure is the robust read.
+- **Scope is limited to ω_b today** — σ₈/ω_c/n_s come online as c112/c113, c102/c103,
+  c104/c105 reach ≥15 draws (re-run; it auto-expands). **σ₈ is the one to watch**
+  (amplitude-like, most degenerate with HOD bias).
+- Refreshed global derivatives on the 164-run grid: condition number 1.50,
+  ∂ξ/∂lnσ₈-vs-2ξ ratio 0.68→1.35 (order-unity now the ω_b leg is fully
+  HOD-marginalised; settles toward 1 as the σ₈ pair fills in).
+
+### Tier-2 HOD emulator prototype + iteration experiment (2026-06-21)
+
+Emulator feasibility study at fixed cosmology (the genuinely space-filling axis).
+The source catalog has **85 cosmologies** (`c000–c181`, the full AbacusSummit
+emulator grid incl. the space-filling `c130–c181` LH) × 500 HODs each — so a real
+emulator is a *compute*, not a *data*, question; only the 9 Fisher cosmologies have
+been processed.
+
+- `scripts/emulator_hod_c000.py` — trains f: θ_HOD(12-D) → data vector on the 50
+  c000 runs; standardise → PCA → per-component {Ridge-linear, GP Matern-5/2}, with
+  leave-one-out CV. `--all-stems` does all 17 stems (510-D); default is full-auto.
+  Outputs `data/emulator/` + `plots/emulator/emulator_hod_c000_{loo,pred}.png`.
+  - **GP ≫ linear** (LOO RMS/spread 0.40 vs 0.84): the HOD response is substantially
+    **nonlinear** — a real emulator buys a lot over the linear response model. But
+    50 points in 12-D is thin (GP captures ~75%, not production-grade) → the lever is
+    more draws (500 exist).
+  - **Per-environment:** data & random **monopoles** emulate well in every quantile;
+    **random quadrupoles fail** (RMS/spread ≈ 1.0) because their targets are
+    noise-dominated, not because the model is too weak.
+  - At ≳1000s of training vectors (tier-3 = process `c130–c181`) switch to an MLP
+    (SUNBIRD-style; torch/jax/tf all in the env); GP is correct for ≤ few-hundred.
+- **Iteration experiment** (`queue/launch_iter_experiment.sh [niter] [ndraws]`,
+  pipeline `--outroot` keeps it isolated in `data/fullbox_iter10/`;
+  `scripts/analyze_iter_experiment.py`). Noise-floor analysis showed data quantiles
+  are signal-rich (noise/spread 0.04–0.22) but **random quadrupoles are
+  noise-limited** (rand_q2/q3 ℓ2 ≈ 0.72–0.78). Reran 10 c000 draws at 10 iterations:
+  noise dropped 1.44–1.77× (≈√(10/3), validates 1/√N); rand_q2/q3 ℓ2 moved
+  NOISE-LIMITED→marginal (0.47), rand_q3 ℓ0 / rand_q4 ℓ2 became signal-rich.
+  - **Two independent levers, now separated:** random quadrupoles need more
+    **iterations** (~25 total to reach signal-rich <0.3: `launch_iter_experiment.sh
+    25 10`); data quantiles need more **draws** (signal-rich but 50-point emulator
+    underfits, e.g. data_q4 ℓ2).
