@@ -355,6 +355,144 @@ and rotated --- ASTRA shrinks and re-orients the cosmology degeneracies.}
 \label{fig:corner}
 \end{figure}
 
+\section{Anatomy of the 5-stem Fisher computation}
+\label{sec:anatomy}
+
+This section opens up the Fisher calculation behind Fig.~\ref{fig:corner} step by
+step, so every ingredient is visible.  The five-stem vector concatenates six
+pieces (the full auto plus the five selected stems), each in mono$+$quad at the
+native $15$-bin resolution, for a data vector of
+$n_b = 6\times2\times15 = 180$ bins.  All figures are produced by
+\code{scripts/fisher\_5stem\_details.py}.
+
+The Fisher matrix is
+\begin{equation}
+F \;=\; D\,C^{-1}\,D^{\mathsf T},
+\label{eq:fisher}
+\end{equation}
+where $D$ is the $(4+12)\times n_b$ matrix of derivatives of the data vector with
+respect to the four cosmological and twelve HOD parameters, and $C$ is the data
+covariance.  The cosmology constraints follow from inverting either the
+cosmology block alone (conditional, HOD fixed) or the full matrix plus the HOD
+prior and taking the cosmology sub-block (marginalised).  The four steps below
+are the four factors in Eq.~\eqref{eq:fisher}.
+
+\subsection*{Step 1 --- the data vector}
+
+Figure~\ref{fig:step1} shows the fiducial (\code{c000} ensemble-mean) data vector,
+one panel per piece.  The monopole amplitude grows monotonically from the void
+(\code{dQ1}) to the knot (\code{dQ4}, an order of magnitude larger): the overdense
+quantile is the most strongly clustered and highest-bias tracer, the underdense
+one the least.  The quadrupoles ($\ell=2$) carry the redshift-space anisotropy.
+These six curves, stacked $[\,\ell0,\ell2\,]$ per piece, are the 180-component
+vector whose information content we are dissecting.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\textwidth]{fisher_5stem/step1_data_vector.png}
+\caption{Step 1: the fiducial five-stem data vector, $s^2\xi_{0,2}(s)$ per piece.
+Amplitude grows void ($\protect\code{dQ1}$) $\to$ knot ($\protect\code{dQ4}$).}
+\label{fig:step1}
+\end{figure}
+
+\subsection*{Step 2 --- the derivatives $D$}
+
+Figure~\ref{fig:step2} shows the four cosmology rows of $D$ (the global-response
+derivatives $\partial\xi/\partial\theta$) across all 180 bins, with the six piece
+blocks marked.  Two features matter for the Fisher information:
+\begin{itemize}
+\item The derivative amplitude is largest on the high-bias \code{dQ4} piece,
+  especially at small $s$ --- the knot quantile is the most cosmology-responsive.
+\item The \emph{shape} of the response differs from piece to piece (e.g.\ the
+  $\omega_b$ acoustic feature versus the broadband $n_s$ tilt appear with
+  different relative weights in each environment).  It is precisely this
+  piece-to-piece difference in $\partial\xi/\partial\theta$ that lets the
+  environment splits break parameter degeneracies the full auto cannot.
+\end{itemize}
+(The twelve HOD rows of $D$, not shown, enter the marginalisation in Step 4.)
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\textwidth]{fisher_5stem/step2_derivatives.png}
+\caption{Step 2: the four cosmology rows of $D$, $\partial\xi/\partial\theta$,
+across the 180-bin vector.  Solid lines separate the six pieces; dotted lines mark
+the $\ell0|\ell2$ split within each piece.  The high-bias \code{dQ4} piece carries
+the largest response.}
+\label{fig:step2}
+\end{figure}
+
+\subsection*{Step 3 --- the covariance $C$}
+
+Figure~\ref{fig:step3} is the $180\times180$ correlation matrix of the data
+vector, estimated from the mean-subtracted subboxes pooled across all nine
+cosmologies ($576$ samples) and scaled to the full-box volume.  The block
+structure is the crux of how much \emph{independent} information the vector holds:
+\begin{itemize}
+\item Within each piece, neighbouring $s$-bins are positively correlated, and the
+  monopole and quadrupole blocks are cross-correlated.
+\item Across pieces, the full auto is strongly correlated with the
+  full$\times$data crosses (\code{xdQ1},\code{xdQ3}) because they literally share
+  the full-sample leg, and the quantile autos are mutually correlated through the
+  shared density field.  These off-diagonal correlations are why the gains
+  saturate: the pieces are not independent, and $C^{-1}$ correctly down-weights
+  the redundancy.
+\end{itemize}
+The $576$ pooled samples are what make $n_b=180$ affordable: the Hartlap factor is
+$(576-180-2)/(576-1)=0.685$, comfortably positive, where the $64$-subbox estimate
+would have failed ($n_b>64$).
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.72\textwidth]{fisher_5stem/step3_correlation.png}
+\caption{Step 3: the $180\times180$ data-vector correlation matrix (pooled
+576-subbox $C$).  Black lines separate the six pieces.  Strong cross-piece
+correlations (e.g.\ full with the \code{xd} crosses) are the redundancy that
+limits the cumulative gain.}
+\label{fig:step3}
+\end{figure}
+
+\subsection*{Step 4 --- the Fisher matrix and parameter covariance}
+
+Combining $D$ and $C$ via Eq.~\eqref{eq:fisher} with the Hartlap-corrected
+precision gives the parameter covariance.  Figure~\ref{fig:step4} shows the
+$4\times4$ cosmology parameter correlation matrices, conditional (HOD fixed) and
+marginalised (HOD nuisances marginalised with the yuan23 prior), with the
+per-parameter $\sigma$ in the titles:
+\begin{center}
+\begin{tabular}{lrrrr}
+\toprule
+ & $\sigma(\omega_b)$ & $\sigma(\omega_c)$ & $\sigma(n_s)$ & $\sigma(\sigma_8)$ \\
+\midrule
+conditional (HOD fixed) & $2.9\times10^{-5}$ & $2.0\times10^{-4}$ & $7.6\times10^{-4}$ & $2.9\times10^{-3}$ \\
+marginalised            & $1.7\times10^{-4}$ & $4.1\times10^{-4}$ & $3.6\times10^{-3}$ & $5.0\times10^{-3}$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+Two lessons:
+\begin{itemize}
+\item \textbf{Marginalising over the HOD costs a factor few} per parameter
+  ($6\times$ on $\omega_b$, $5\times$ on $n_s$): the cosmology directions that
+  overlap the HOD response are degraded most.  This is the honest price of not
+  knowing the galaxy--halo connection, and it is the regime all our headline
+  numbers are quoted in.
+\item \textbf{Marginalisation re-shapes the degeneracies.}  Conditionally,
+  $\omega_b$ is strongly anti-correlated with $\sigma_8$ ($-0.84$) and
+  $\omega_c$ with $n_s$ ($-0.79$); after HOD marginalisation these soften and new
+  correlations appear ($\omega_b$--$\omega_c=+0.55$, $n_s$--$\sigma_8=-0.42$).
+  The rotation of the ellipses in Fig.~\ref{fig:corner} is exactly this change of
+  correlation structure.
+\end{itemize}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\textwidth]{fisher_5stem/step4_fisher.png}
+\caption{Step 4: cosmology parameter correlation matrices from
+$F=D\,C^{-1}D^{\mathsf T}$, conditional (left) and HOD-marginalised (right), with
+the per-parameter $\sigma$ in the titles.  HOD marginalisation both inflates the
+errors and re-shapes the degeneracies.}
+\label{fig:step4}
+\end{figure}
+
 \section{Conclusions}
 
 \begin{enumerate}
@@ -393,6 +531,8 @@ All numbers are reproduced by \code{scripts/fisher\_vector\_search.py} (the full
 sweep; ranked table in
 \code{plots/vector\_search/vector\_search\_results.csv}),
 \code{scripts/fisher\_greedy\_chain.py} (the greedy chain), and
-\code{scripts/fisher\_compare\_full\_vs\_5stem.py} (the corner comparison).
+\code{scripts/fisher\_compare\_full\_vs\_5stem.py} (the corner comparison), and
+\code{scripts/fisher\_5stem\_details.py} (the step-by-step anatomy of
+Sec.~\ref{sec:anatomy}).
 
 \end{document}
