@@ -1,0 +1,85 @@
+\documentclass[11pt]{article}
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{amsmath}\usepackage{amssymb}\usepackage{graphicx}
+\usepackage{booktabs}\usepackage{hyperref}
+\newcommand{\Mpch}{\,h^{-1}\,\mathrm{Mpc}}
+\newcommand{\code}[1]{\texttt{#1}}
+\title{Design note: the Tier-3 ASTRA emulator for cosmological inference}
+\author{ASTRA clustering project}\date{June 2026}
+\begin{document}\maketitle
+
+\begin{abstract}
+The Fisher work (see the data-vector-search note) shows ASTRA quantile clustering
+can tighten $\omega_b,\omega_c,n_s$ by several-fold over the 2PCF, but that the
+gain lives almost entirely at small scales ($s\lesssim40\Mpch$).  Turning this into
+\emph{measured} constraints needs a forward model $\xi(\theta)$ over the whole
+prior --- an emulator trained on a space-filling cosmology grid --- because a
+Fisher forecast only needs local derivatives, and small scales cannot be modelled
+analytically.  This note records the Tier-3 design and the pilot.
+\end{abstract}
+
+\section{What changes versus Fisher}
+Fisher needs derivatives at one fiducial, so the nine-cosmology derivative star
+suffices.  Inference needs $\xi(\theta)$ everywhere in the prior, i.e.\ a
+space-filling cosmology grid plus an emulator.  The catalogs exist: the source has
+\textbf{85 cosmologies} (\code{c000}--\code{c181}; we have used 9) and 500 HODs
+each (we have used 50).  Tier-3 is therefore a compute problem, not a data one.
+
+\section{Design, driven by the findings}
+\begin{enumerate}
+\item \textbf{Cosmologies: the space-filling block \code{c130}--\code{c181}}
+  ($\sim$52, the AbacusSummit emulator Latin hypercube).  It varies the
+  \emph{broader} parameter set (\,$w_0,w_a,N_{\rm eff}$, running\,), so the
+  emulator inputs must include those ($\sim$8-D cosmology), not just the four
+  $\Lambda$CDM parameters.  The nine derivative cosmologies are held out as
+  validation anchors.
+\item \textbf{HODs: $\sim$100--150 per cosmology} from the unused 500.  The HOD
+  response is effectively $\sim$4-D (\code{SIGMA}, \code{LOGM\_CUT} dominate) and
+  50 draws already captured $\sim$75\%, so $\sim$120 is ample.  Total
+  $\sim$52$\times$120 $\approx$ 6000 training runs.
+\item \textbf{Focused, small-scale data vector.}  The information is at
+  $s\lesssim40\Mpch$ and in the extreme-environment crosses (void/knot/filament,
+  data and random).  Emulate a reduced vector of those pieces, \emph{finely
+  binned at small scales} ($\sim$2--4$\Mpch$, vs the current 10$\Mpch$), not all
+  17 stems over 0--150.
+\item \textbf{Phases.}  Single phase (\code{ph000}) bakes in one cosmic-variance
+  realisation --- a problem at large scales, but negligible at the small scales
+  that carry the signal --- so \code{ph000} is adequate for the emulator
+  \emph{mean}.  Use the 25 AbacusSummit fiducial phases for the
+  \emph{covariance}.
+\item \textbf{Iterations.}  Run the full campaign at $\sim$10 ASTRA iterations to
+  lower the per-vector noise floor (the random legs benefit).  The \emph{pilot}
+  uses 3 iterations (cheap, $\sim$25 min, fits the 1-h queue limit) since the
+  small scales are already signal-rich.
+\item \textbf{Architecture.}  $\sim$6000 points over $\sim$20-D input
+  $\Rightarrow$ an MLP (SUNBIRD-style), not a GP (which dies past a few-thousand
+  points).  PCA or direct multi-output, covariance-weighted MSE loss (matches the
+  inference metric), an ensemble for the emulator uncertainty, and
+  \emph{leave-one-cosmology-out} validation (cosmology is the sparse axis).
+\end{enumerate}
+
+\section{The pilot (this note's deliverable)}
+A small batch to decide go/no-go \emph{before} the full campaign:
+\begin{itemize}
+\item \textbf{Runs:} 10 cosmologies spread over \code{c130}--\code{c181}
+  $\times$ 50 maximin HODs $=$ 500 full-box runs at 3 iterations, into the
+  isolated root \code{data/fullbox\_tier3/} (so the Fisher dataset is untouched).
+  \code{scripts/select\_tier3\_pilot.py} + \code{queue/launch\_tier3\_pilot.sh}.
+\item \textbf{The one question it must answer:} can an emulator reach
+  \emph{sub-noise accuracy at $s<40\Mpch$} for the environment crosses, validated
+  leave-one-cosmology-out?  The entire Tier-3 payoff rides on this.
+\item \textbf{If yes:} run the full \code{c130}--\code{c181}$\times$120 campaign at
+  10 iterations, build the MLP, then MCMC on held-out mocks (does it recover truth;
+  does the measured $\sigma$ match the Fisher forecast --- it will be looser, esp.\
+  $\sigma_8$), then apply to data.
+\item \textbf{If no:} fall back to the conservative-scale ($s>40\Mpch$) result,
+  $\sim$1.5$\times$ on $\omega_b,\omega_c,n_s$, with analytic modelling and no
+  emulator.
+\end{itemize}
+
+\section{Compute}
+Pilot: 500 runs $\times$ 3 iters ($\sim$25 min) $\approx$ 200 node-hours, backfills
+in $\sim$1--2 days.  Full campaign: 6000 runs $\times$ 10 iters ($\sim$1.5 h)
+$\approx$ 9000 node-hours --- a few weeks of queue, hence the pilot first.
+
+\end{document}
