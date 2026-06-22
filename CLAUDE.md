@@ -48,7 +48,25 @@ astra-clustering/
 │   ├── plot_fisher_fullbox_compare.py ← Tier-0: subbox vs full-box derivative σ comparison
 │   ├── select_hod_calibration.py ← Tier-1: maximin-pick c000 HOD draws for ∂ξ/∂θ_HOD
 │   ├── compute_hod_derivatives.py← Tier-1: regress ∂ξ/∂θ_HOD, subtract HOD contamination
-│   └── fisher_joint.py           ← joint cosmology+HOD Fisher, HOD-marginalised errors
+│   ├── compute_response_global.py← global linear response ξ(θ_cosmo,θ_HOD) → HOD-clean derivs
+│   ├── fisher_joint.py           ← joint cosmology+HOD Fisher, HOD-marginalised errors
+│   ├── test_hod_response_cosmo_independence.py ← per-cosmology HOD-gradient comparison
+│   ├── emulator_hod_c000.py      ← tier-2 GP/linear HOD emulator at c000 (LOO)
+│   ├── emulator_diagnostics.py   ← GP calibration / learning curve / ARD relevance
+│   ├── fisher_emulator_B.py      ← approach B: per-cosmology GP → matched-HOD derivatives
+│   ├── analyze_iter_experiment.py← iter-3 vs iter-10 noise-floor analysis
+│   ├── fisher_vector_search.py   ← sweep 16 singles + 120 pairs for the best data vector
+│   ├── fisher_vector_addto.py    ← greedy next-stem ranking from a fixed base
+│   ├── fisher_greedy_chain.py    ← greedy forward selection (data legs)
+│   ├── fisher_greedy_chain_all.py← greedy chain over all 16 stems (noise-aware)
+│   ├── fisher_5stem_details.py   ← step-by-step anatomy of a multi-stem Fisher
+│   ├── fisher_multipole_compare.py← monopole vs quadrupole vs both
+│   ├── fisher_compare_full_vs_5stem.py ← 2PCF vs full+xrQ4+xrQ1 corner (FoM printed)
+│   ├── fisher_forecast_update.py ← noise-aware 3-way forecast corner
+│   ├── fisher_noise_aware.py     ← #1: subtract derivative-noise bias Tr(C⁻¹Covδ)
+│   ├── fisher_nonlinear_response.py ← #3: quadratic-in-HOD response, bias check
+│   ├── fisher_scale_environment.py← scale-cut survival + signature map (data+random)
+│   └── select_tier3_pilot.py     ← tier-3: maximin HODs for c130–c181 pilot
 ├── queue/
 │   ├── run_single_box.sh         ← sbatch wrapper, single-box pipeline
 │   ├── run_subboxes.sh           ← sbatch wrapper, subbox pipeline
@@ -56,10 +74,13 @@ astra-clustering/
 │   ├── run_fullbox_cosmo.sh      ← same for the full-box pipeline (full CPU node)
 │   ├── launch_fisher_subboxes.sh ← submits all nine Fisher (cosmo, hod) subbox runs
 │   ├── launch_fisher_fullbox.sh  ← submits all nine full-box runs
-│   └── launch_hod_calibration.sh ← Tier-1: submits the selected c000 HOD-calibration full-box runs
+│   ├── launch_hod_calibration.sh ← Tier-1: submits the selected c000 HOD-calibration full-box runs
+│   ├── launch_hod_ensemble.sh    ← global-response ensemble: 50 HODs × 9 cosmologies
+│   ├── launch_iter_experiment.sh ← higher-iteration runs → data/fullbox_iter10/
+│   └── launch_tier3_pilot.sh     ← tier-3 pilot: c130–c181 × 50 HODs → data/fullbox_tier3/
 ├── data/             ← pipeline output; subdirs {cosmo}_hod{NNN}/, fullbox/, derivatives/
 ├── plots/            ← figure output; mirrors the data/ layout
-├── notes/            ← LaTeX technical notes (zero_crossing/)
+├── notes/            ← LaTeX technical notes (zero_crossing/, fisher/, vector_search/, tier3_emulator/)
 ├── CLAUDE.md
 └── README.md
 ```
@@ -712,3 +733,55 @@ been processed.
     **iterations** (~25 total to reach signal-rich <0.3: `launch_iter_experiment.sh
     25 10`); data quantiles need more **draws** (signal-rich but 50-point emulator
     underfits, e.g. data_q4 ℓ2).
+
+### Data-vector search, random-leg vindication, scale finding (2026-06-20→22)
+
+Full writeup: `notes/vector_search/vector_search_note.{tex,pdf}`. Fisher search
+over the ASTRA data vectors (data/random × env-quantile autos & full-crosses ×
+mono/quad), HOD-marginalised, pooled 576-subbox covariance.
+
+- **Random legs are real signal, not an artefact** — tested two ways and they
+  survive both: noise-aware Fisher (`fisher_noise_aware.py`, #1: subtract
+  Tr(C⁻¹·Covδ) using the random ASTRA-iteration noise) deflates them only ~25–40%;
+  a quadratic-in-HOD response (`fisher_nonlinear_response.py`, #3) shifts all
+  derivatives ~30–60% equally. The random-quantile *monopoles* carry real
+  cosmic-web signal; only the velocity-free *quadrupoles* are weak. **In data the
+  randoms come from the LSS random catalog matched to the survey window → survey-
+  robust.** (Earlier "random-quadrupole trap / artefact" framing was wrong.)
+- **Optimal noise-aware vector** (`fisher_greedy_chain_all.py`): full + xrQ4 + xrQ1
+  + xdQ3 + xdQ4 + dQ1 + xrQ3 → **FoM3 210×** vs 31× data-legs-only; per-param
+  ω_b 5.2×, ω_c 7.6×, n_s 4.8×, σ8 2.7×. Just the **two void/knot random crosses**
+  full+xrQ4+xrQ1 already give FoM3 48× (`fisher_compare_full_vs_5stem.py`).
+  Workhorses = extreme-environment CROSSES. Forecast corner:
+  `fisher_forecast_update.py`.
+- **THE gain is small-scale** (`fisher_scale_environment.py`): FoM3 210→20.6→4.4×
+  at s>0/20/40 Mpc/h; s<40 band alone holds 143×, BAO/large ~1× — because ASTRA
+  splits by local density and all quantiles cross zero together at large s. So the
+  headline gains need *simulation-based small-scale modelling*; a conservative
+  s>40 cut leaves a robust but modest ~1.5×. σ8 is the laggard throughout.
+- **Greedy ≠ optimal**: it is a useful interpretable heuristic; MOPED/compression
+  is the optimal-but-abstract alternative.
+
+### Tier-3 emulator: design + pilot (2026-06-21→22)
+
+Design note: `notes/tier3_emulator/tier3_emulator_note.{tex,pdf}`. Goal: turn the
+Fisher *forecast* into *measured* constraints via a simulation-based MLP emulator
+ξ(θ_cosmo, θ_HOD), since the gain is small-scale (can't use perturbation theory).
+
+- **Derivatives**: train an MLP on the space-filling block **c130–c181** (~52
+  cosmologies, the AbacusSummit emulator LH; varies the broader w0waCDM+ set →
+  ~8-D cosmology input) × ~120 HODs; derivatives = autodiff at the fiducial
+  (nonlinear, HOD-clean by single-HOD evaluation). These halos *are* HOD-populated
+  at ph000 (ntbfin) — reachable.
+- **Covariance constraint (verified)**: ntbfin HOD catalogs are **ph000 only**;
+  the AbacusSummit halo catalogs (25 base phases + 1883-box `small/` suite) are on
+  CFS but using them = new HOD population, which is **out of scope (no new HOD
+  generation)**. So the covariance stays the **subbox estimate** (~10–20% absolute)
+  unless an external pre-populated galaxy mock suite is adopted — the main residual
+  weakness of Tier-3.
+- **Pilot (launched 2026-06-21)**: 10 cosmologies (c130 c135 … c180) × 50 maximin
+  HODs × 3 iters → isolated `data/fullbox_tier3/` (`select_tier3_pilot.py`,
+  `launch_tier3_pilot.sh`). Pipeline validated on c130 (sane vectors). Go/no-go:
+  sub-noise emulator accuracy at s<40, leave-one-cosmology-out. Next steps: build
+  the c130–c181 cosmology-param table; train a prototype MLP once ≥3–4 cosmologies
+  land.
