@@ -38,16 +38,17 @@ and refitting with a nonlinear HOD response --- and find the random legs
 \emph{survive both}: their environment-classified monopoles carry real cosmic-web
 signal, and the gains are neither a noise nor a nonlinearity artefact (only
 $\sigma_8$ stays untrustworthy, limited by the nine-cosmology grid).  Among the
-\emph{data}-leg vectors --- a conservative subset --- the gains are
-already substantial: adding a single full$\times$data-quantile cross buys $\sim\!5\times$ in
-the three-parameter FoM, and a greedy forward selection that spans the four
-density quantiles reaches a five-stem vector
-(\code{full}$+$\code{xdQ1}$+$\code{dQ1}$+$\code{dQ2}$+$\code{xdQ3}$+$\code{dQ4})
-with $\FoM_3 = 43\times$ --- marginalised errors tighter than the standard 2PCF
-by $3.4\times$ ($\omega_b$), $4.1\times$ ($\omega_c$), $3.6\times$ ($n_s$) and
-$2.8\times$ ($\sigma_8$), with clear diminishing returns past four stems.  We
-document the method, the random-quadrupole diagnosis, the honest ranking, and the greedy
-chain.
+\emph{data}-leg vectors --- a conservative subset --- a greedy forward selection
+reaches a five-stem vector with $\FoM_3 = 43\times$ (naive Fisher), tightening the
+standard 2PCF by $3$--$4\times$ on $\omega_b,\omega_c,n_s$.  Folding the
+vindicated random legs back in, with the derivative noise subtracted, roughly
+$7\times$'s this: the optimal noise-aware chain
+(\code{full}$+$\code{xrQ4}$+$\code{xrQ1}$+$\code{xdQ3}$+$\code{xdQ4}$+$\code{dQ1}$+$\code{xrQ3})
+reaches $\FoM_3 \simeq 210\times$ --- marginalised errors tighter than the 2PCF by
+$\sigma(\omega_b)\,5.2\times$, $\sigma(\omega_c)\,7.6\times$, $\sigma(n_s)\,4.8\times$
+and $\sigma(\sigma_8)\,2.7\times$ from a single box, led by the extreme void/knot
+random crosses.  We document the method, the robustness tests, and the greedy
+chains.
 \end{abstract}
 
 \section{Question and data}
@@ -761,6 +762,83 @@ with the cumulative $\FoM_3$ at each step.}
 \label{fig:multipole}
 \end{figure}
 
+\section{Folding in the random legs: the optimal vector}
+\label{sec:allstems}
+
+Sec.~\ref{sec:caveat} established that the random legs are real signal, not an
+artefact.  We can therefore redo the greedy selection over \emph{all sixteen}
+ASTRA stems --- data autos, random autos, and both kinds of full-cross crosses ---
+and let the algorithm use whichever it likes.  To be honest we score every
+candidate with the \emph{noise-aware} $\FoM_3$ (the derivative-noise bias of
+Sec.~\ref{sec:caveat} subtracted), and for a fair comparison we run a
+data-legs-only chain with the \emph{same} noise-aware metric
+(\code{scripts/fisher\_greedy\_chain\_all.py}).
+
+\paragraph{A note on the numbers.}  The noise-aware metric deflates every gain by
+$\sim\!25\%$ relative to the naive Fisher of Sec.~\ref{sec:greedy}: the
+conservative data-leg chain that read $43\times$ there is $31\times$ here.  All
+figures in this section are the honest, noise-aware values.
+
+\begin{table}[t]
+\centering
+\caption{Noise-aware greedy chain over all sixteen ASTRA stems.  $\sigma$ are the
+HOD-marginalised errors of the cumulative vector.  Greedy leads with the extreme
+random crosses (knot \code{xrQ4}, void \code{xrQ1}).}
+\label{tab:allstems}
+\begin{tabular}{cllrrrrr}
+\toprule
+step & add & & $\FoM_3$ & $\sigma(\omega_b)$ & $\sigma(\omega_c)$ & $\sigma(n_s)$ & $\sigma(\sigma_8)$ \\
+\midrule
+0 & ---         & full auto    &   1.0 & $5.7\times10^{-4}$ & $1.7\times10^{-3}$ & $1.3\times10^{-2}$ & $1.4\times10^{-2}$ \\
+1 & \code{xrQ4} & full$\times$rand knot &   7.6 & $5.9\times10^{-4}$ & $1.4\times10^{-3}$ & $7.3\times10^{-3}$ & $1.4\times10^{-2}$ \\
+2 & \code{xrQ1} & full$\times$rand void &  48.5 & $2.1\times10^{-4}$ & $4.6\times10^{-4}$ & $4.1\times10^{-3}$ & $1.2\times10^{-2}$ \\
+3 & \code{xdQ3} & full$\times$data       &  86.1 & $1.7\times10^{-4}$ & $3.2\times10^{-4}$ & $3.5\times10^{-3}$ & $8.3\times10^{-3}$ \\
+4 & \code{xdQ4} & full$\times$data knot  & 124.6 & $1.4\times10^{-4}$ & $2.9\times10^{-4}$ & $3.0\times10^{-3}$ & $7.0\times10^{-3}$ \\
+5 & \code{dQ1}  & data void auto         & 177.7 & $1.2\times10^{-4}$ & $2.4\times10^{-4}$ & $2.8\times10^{-3}$ & $5.3\times10^{-3}$ \\
+6 & \code{xrQ3} & full$\times$rand       & 209.8 & $1.1\times10^{-4}$ & $2.2\times10^{-4}$ & $2.7\times10^{-3}$ & $5.3\times10^{-3}$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The optimal chain is
+\code{full}$+$\code{xrQ4}$+$\code{xrQ1}$+$\code{xdQ3}$+$\code{xdQ4}$+$\code{dQ1}$+$\code{xrQ3}
+(Table~\ref{tab:allstems}, Fig.~\ref{fig:allstems}).  Three points:
+
+\begin{itemize}
+\item \textbf{The random legs roughly $7\times$ the constraining power.}  At six
+  stems the all-stems vector reaches $\FoM_3 = 210\times$, against $31\times$ for
+  the data-legs-only chain under the \emph{same} noise-aware metric.  Per
+  parameter the gain over the standard 2PCF is $\sigma(\omega_b)\,5.2\times$,
+  $\sigma(\omega_c)\,7.6\times$, $\sigma(n_s)\,4.8\times$ and
+  $\sigma(\sigma_8)\,2.7\times$.
+\item \textbf{The extreme random crosses lead.}  Greedy picks \code{xrQ4} (full
+  sample crossed with the knot-environment randoms) and \code{xrQ1} (with the
+  void randoms) first --- two nearly independent geometric directions that take
+  $\FoM_3$ from $1$ to $48$.  Crossing the galaxies with the void- and
+  knot-traced random fields probes the environment--density relation, which the
+  data legs alone do not isolate.
+\item \textbf{$\sigma_8$ still lags.}  It improves only $2.7\times$ and is the
+  flattest curve in Fig.~\ref{fig:allstems}, consistent with its being the one
+  direction the nine-cosmology grid cannot pin down.
+\end{itemize}
+
+\paragraph{Caveats.}  These are noise-aware (random derivative noise subtracted)
+but use the \emph{linear} global derivatives; Sec.~\ref{sec:caveat} showed
+nonlinearity shifts the derivatives by $\sim\!30$--$60\%$ while preserving the
+ranking, so read $210\times$ as the right order of magnitude, not a precise value.
+The absolute $\sigma$ also carry the $\sim\!10$--$20\%$ covariance uncertainty of
+Sec.~\ref{sec:covrobust}.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\textwidth]{greedy_chain_all.png}
+\caption{Left: noise-aware $\FoM_3$ gain along the greedy chain, all sixteen stems
+(orange) vs data legs only (blue dashed); labels in red are random-leg picks.
+Right: per-parameter $\sigma$ improvement over the full auto for the all-stems
+chain; $\sigma_8$ (red) is the flattest.}
+\label{fig:allstems}
+\end{figure}
+
 \section{Conclusions}
 
 \begin{enumerate}
@@ -785,11 +863,18 @@ with the cumulative $\FoM_3$ at each step.}
   vector is worse than the full auto alone.
 \item A \textbf{greedy chain} over the data legs
   (\code{full}$+$\code{xdQ1}$+$\code{dQ1}$+$\code{dQ2}$+$\code{xdQ3}$+$\code{dQ4})
-  reaches $\FoM_3 = 43\times$ at five stems, tightening the standard-2PCF errors
-  by $3.4$--$4.1\times$ on $\omega_b,\omega_c,n_s$ and $2.8\times$ on $\sigma_8$
-  (Fig.~\ref{fig:corner}).  Returns diminish sharply ($5.1\to2.7\to1.8\to1.3$
-  per step), so $\sim\!4$ stems is the practical optimum, and the gains come from
+  reaches $\FoM_3 = 43\times$ at five stems (naive Fisher), tightening the
+  standard-2PCF errors by $3.4$--$4.1\times$ on $\omega_b,\omega_c,n_s$ and
+  $2.8\times$ on $\sigma_8$ (Fig.~\ref{fig:corner}).  Returns diminish sharply,
+  so $\sim\!4$ stems is the practical optimum, and the gains come from
   \emph{spanning} the four environments rather than repeating one.
+\item \textbf{Folding the random legs back in roughly $7\times$'s the FoM}
+  (Sec.~\ref{sec:allstems}).  The optimal noise-aware chain
+  (\code{full}$+$\code{xrQ4}$+$\code{xrQ1}$+$\code{xdQ3}$+$\code{xdQ4}$+$\code{dQ1}$+$\code{xrQ3})
+  reaches $\FoM_3 \simeq 210\times$ vs $31\times$ for the data legs under the same
+  noise-aware metric, led by the extreme void/knot random crosses; per parameter
+  the gain over the 2PCF is $\sigma(\omega_b)\,5.2\times$, $\sigma(\omega_c)\,7.6\times$,
+  $\sigma(n_s)\,4.8\times$ and $\sigma(\sigma_8)\,2.7\times$ from one box.
 \item Single vectors do not improve $\sigma_8$ (HOD-amplitude degeneracy,
   unreliable derivative), but the multi-environment combination does so modestly;
   $\FoM_3$ excluding $\sigma_8$ remains the trustworthy score.
@@ -798,15 +883,15 @@ with the cumulative $\FoM_3$ at each step.}
   $2.4$--$3.6\times$ and is the dominant source of $\sigma_8$ information; its
   value is larger for the ASTRA splits than for the plain 2PCF
   (Sec.~\ref{sec:multipole}).
-\item \textbf{Next steps.}  (i) Fold the now-vindicated random legs back into the
-  greedy chain and the optimal data vector (their signal-rich monopoles should add
-  beyond the data legs); (ii) settle $\sigma_8$ --- the only untrustworthy
-  direction --- which the nine-cosmology grid cannot pin down and which needs more
-  cosmologies, not reanalysis; (iii) estimate the covariance from many independent
-  full boxes (e.g.\ the 25 AbacusSummit phases) before quoting absolute error bars,
-  since the relative rankings are robust to the $\sim\!6\%$ level
-  (Sec.~\ref{sec:covrobust}) but the absolute $\sigma$ rely on the subbox
-  approximation.
+\item \textbf{Next steps.}  (i) Propagate the derivative noise fully (off-diagonal
+  and the HOD rows, not just the cosmology diagonal) and combine with the nonlinear
+  response, to turn the $\simeq\!210\times$ into a precise, fully-debiased number;
+  (ii) settle $\sigma_8$ --- the only untrustworthy direction --- which the
+  nine-cosmology grid cannot pin down and which needs more cosmologies, not
+  reanalysis; (iii) estimate the covariance from many independent full boxes
+  (e.g.\ the 25 AbacusSummit phases) before quoting absolute error bars, since the
+  relative rankings are robust to the $\sim\!6\%$ level (Sec.~\ref{sec:covrobust})
+  but the absolute $\sigma$ rely on the subbox approximation.
 \end{enumerate}
 
 All numbers are reproduced by \code{scripts/fisher\_vector\_search.py} (the full
@@ -816,6 +901,9 @@ sweep; ranked table in
 \code{scripts/fisher\_compare\_full\_vs\_5stem.py} (the corner comparison), and
 \code{scripts/fisher\_5stem\_details.py} (the step-by-step anatomy of
 Sec.~\ref{sec:anatomy}), and \code{scripts/fisher\_multipole\_compare.py} (the
-monopole/quadrupole study of Sec.~\ref{sec:multipole}).
+monopole/quadrupole study of Sec.~\ref{sec:multipole}).  The robustness tests and
+the all-stems chain of Secs.~\ref{sec:caveat} and \ref{sec:allstems} use
+\code{scripts/fisher\_noise\_aware.py}, \code{scripts/fisher\_nonlinear\_response.py},
+and \code{scripts/fisher\_greedy\_chain\_all.py}.
 
 \end{document}
