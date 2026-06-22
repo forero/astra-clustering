@@ -47,8 +47,11 @@ $7\times$'s this: the optimal noise-aware chain
 reaches $\FoM_3 \simeq 210\times$ --- marginalised errors tighter than the 2PCF by
 $\sigma(\omega_b)\,5.2\times$, $\sigma(\omega_c)\,7.6\times$, $\sigma(n_s)\,4.8\times$
 and $\sigma(\sigma_8)\,2.7\times$ from a single box, led by the extreme void/knot
-random crosses.  We document the method, the robustness tests, and the greedy
-chains.
+random crosses.  A scale decomposition shows the gain is almost entirely a
+small-scale effect ($s\lesssim40\Mpch$): it needs simulation-based small-scale
+modelling, while a conservative $s>40\Mpch$ cut leaves a robust $\sim\!1.5\times$.
+We document the method, the robustness tests, the greedy chains, and the scale and
+environment decomposition.
 \end{abstract}
 
 \section{Question and data}
@@ -864,6 +867,80 @@ chain; $\sigma_8$ (red) is the flattest.}
 \label{fig:allstems}
 \end{figure}
 
+\section{Where the gain lives: a small-scale phenomenon}
+\label{sec:scale}
+
+For a real analysis the decisive question is not just \emph{how much} ASTRA gains
+but \emph{at which scales} --- small scales ($s\lesssim40\Mpch$) are
+systematics-prone and need simulation-based modelling, while
+BAO/large scales are robust and analytically modellable.  We therefore decompose
+the noise-aware Fisher information by separation, keeping both data and random
+legs (\code{scripts/fisher\_scale\_environment.py}); the random legs are
+survey-applicable, since in data they are built from LSS randoms matched to the
+radial and angular selection window.
+
+\begin{table}[t]
+\centering
+\caption{Scale-cut survival of the all-stems optimal vector: noise-aware $\FoM_3$
+and per-parameter $\sigma$ improvement over the 2PCF when only scales
+$s>s_{\rm cut}$ are used.  Almost all of the gain is at small scales.}
+\label{tab:scale}
+\begin{tabular}{lrrrrr}
+\toprule
+$s_{\rm cut}\,[\Mpch]$ & $\FoM_3$ & $\omega_b$ & $\omega_c$ & $n_s$ & $\sigma_8$ \\
+\midrule
+0 (all) & $210\times$ & $5.2\times$ & $7.6\times$ & $4.8\times$ & $2.7\times$ \\
+20      & $20.6\times$ & $2.6\times$ & $2.6\times$ & $2.7\times$ & $1.2\times$ \\
+40      & $4.4\times$  & $1.8\times$ & $1.9\times$ & $1.4\times$ & $1.1\times$ \\
+60      & $1.9\times$  & $1.3\times$ & $1.7\times$ & $1.0\times$ & $0.8\times$ \\
+80      & $1.1\times$  & $1.0\times$ & $1.6\times$ & $0.7\times$ & $0.6\times$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{itemize}
+\item \textbf{The gain is overwhelmingly small-scale.}  Table~\ref{tab:scale}
+  shows the $210\times$ $\FoM_3$ collapse to $20.6\times$ at $s>20$, $4.4\times$
+  at $s>40$ and $1.9\times$ at $s>60$.  Taking each band in isolation, the small
+  band ($s<40$) alone gives $\FoM_3=143\times$, while intermediate, BAO and large
+  scales give $1.6\times$, $0.7\times$ and $0.1\times$ --- i.e.\ essentially
+  nothing above $\sim\!40\Mpch$ (Fig.~\ref{fig:scale}, top).
+\item \textbf{Why.}  ASTRA splits by \emph{local density} --- an intrinsically
+  small-scale quantity --- so the environment-dependent clustering differences
+  are largest at small $s$.  At BAO/large scales every quantile is linearly
+  biased and they all cross zero at the same $\sim\!120\Mpch$, so environment
+  splitting adds no information there.  This is the same linear-bias physics as
+  the shared zero crossing of all our statistics.
+\item \textbf{Which signatures (Fig.~\ref{fig:scale}, bottom).}  The workhorses
+  are the extreme-environment \emph{crosses}, data and random alike:
+  full$\times$rand-void drives $\omega_c$ most ($2.6\times$ as a single addition),
+  with full$\times$data-void/knot and full$\times$rand-filament crosses leading
+  $\omega_b$; $n_s$ favours filament crosses, and $\sigma_8$ the filament autos.
+  The random crosses contribute genuinely --- consistent with their vindication
+  in Sec.~\ref{sec:caveat}.
+\end{itemize}
+
+\noindent\textbf{Implications for data.}  The large headline gains ($210\times$,
+$43\times$) are a small-scale effect and therefore require \emph{simulation-based}
+small-scale modelling (an emulator, as in density-split clustering analyses of
+real surveys), not perturbation theory.  Restricting to robust, easily-modelled
+scales ($s>40\Mpch$) leaves a real but modest $\sim\!1.4$--$1.9\times$ on
+$\omega_b,\omega_c,n_s$ (and no $\sigma_8$ gain).  So there are two honest
+headlines depending on the modelling ambition: $\sim\!1.5\times$ with a
+conservative scale cut, or several-fold with a trusted small-scale emulator.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\textwidth]{scale_environment.png}
+\caption{Top: scale-cut survival (left, FoM3; middle, per parameter) and
+single-band FoM3 (right) for the all-stems optimal vector --- the gain is
+concentrated at $s<40\Mpch$.  Bottom: signature map of the per-parameter $\sigma$
+improvement from adding each (population $\times$ environment) piece to the full
+auto, monopole (left) and quadrupole (right); the extreme-environment crosses
+dominate.}
+\label{fig:scale}
+\end{figure}
+
 \section{Conclusions}
 
 \begin{enumerate}
@@ -900,6 +977,14 @@ chain; $\sigma_8$ (red) is the flattest.}
   noise-aware metric, led by the extreme void/knot random crosses; per parameter
   the gain over the 2PCF is $\sigma(\omega_b)\,5.2\times$, $\sigma(\omega_c)\,7.6\times$,
   $\sigma(n_s)\,4.8\times$ and $\sigma(\sigma_8)\,2.7\times$ from one box.
+\item \textbf{The gain is a small-scale phenomenon} (Sec.~\ref{sec:scale}).  The
+  $\FoM_3$ falls $210\to20.6\to4.4\times$ at cuts $s>0,20,40\Mpch$; the $s<40$
+  band alone holds $143\times$ while BAO/large scales give $\sim\!1\times$, because
+  the environment split is a local-density (small-scale) construct and all
+  quantiles cross zero together at large $s$.  So the headline gains need
+  simulation-based small-scale modelling; a conservative $s>40\Mpch$ cut leaves a
+  robust but modest $\sim\!1.4$--$1.9\times$ on $\omega_b,\omega_c,n_s$.  The
+  workhorse signatures are the extreme-environment (void/knot/filament) crosses.
 \item Single vectors do not improve $\sigma_8$ (HOD-amplitude degeneracy,
   unreliable derivative), but the multi-environment combination does so modestly;
   $\FoM_3$ excluding $\sigma_8$ remains the trustworthy score.
@@ -929,6 +1014,9 @@ Sec.~\ref{sec:anatomy}), and \code{scripts/fisher\_multipole\_compare.py} (the
 monopole/quadrupole study of Sec.~\ref{sec:multipole}).  The robustness tests and
 the all-stems chain of Secs.~\ref{sec:caveat} and \ref{sec:allstems} use
 \code{scripts/fisher\_noise\_aware.py}, \code{scripts/fisher\_nonlinear\_response.py},
-and \code{scripts/fisher\_greedy\_chain\_all.py}.
+and \code{scripts/fisher\_greedy\_chain\_all.py}; the updated forecast and the
+scale/environment decomposition of Secs.~\ref{sec:allstems} and \ref{sec:scale}
+use \code{scripts/fisher\_forecast\_update.py} and
+\code{scripts/fisher\_scale\_environment.py}.
 
 \end{document}
