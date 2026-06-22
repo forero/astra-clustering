@@ -42,11 +42,30 @@ each (we have used 50).  Tier-3 is therefore a compute problem, not a data one.
   data and random).  Emulate a reduced vector of those pieces, \emph{finely
   binned at small scales} ($\sim$2--4$\Mpch$, vs the current 10$\Mpch$), not all
   17 stems over 0--150.
-\item \textbf{Phases.}  Single phase (\code{ph000}) bakes in one cosmic-variance
-  realisation --- a problem at large scales, but negligible at the small scales
-  that carry the signal --- so \code{ph000} is adequate for the emulator
-  \emph{mean}.  Use the 25 AbacusSummit fiducial phases for the
-  \emph{covariance}.
+\item \textbf{Phases / covariance --- a real constraint.}  Single phase
+  (\code{ph000}) is adequate for the emulator \emph{mean} (the gain is at small
+  scales, where cosmic variance is small).  The \emph{covariance}, however, is the
+  hard part.  We verified what is on disk: the \code{ntbfin} HOD catalogs have
+  \emph{only} \code{ph000} for every cosmology --- no extra phases and no
+  small-box galaxy catalogs.  The underlying AbacusSummit \emph{halo} catalogs
+  \emph{are} on CFS (\code{/global/cfs/cdirs/desi/cosmosim/Abacus}: 25 base phases
+  \code{ph000}--\code{ph024}, and the 1883-box \code{small/} suite, the standard
+  covariance set), but turning them into galaxy catalogs would mean
+  \textbf{populating new HODs}, which is explicitly \emph{out of scope} (no new
+  HOD generation).  Consequences:
+  \begin{itemize}
+  \item The \textbf{derivative} side of Tier-3 is fully reachable: the emulator
+    grid \code{c130}--\code{c181} \emph{is} HOD-populated at \code{ph000} (that is
+    what the pilot runs on).
+  \item The \textbf{covariance} stays the \emph{subbox} estimate (the pooled
+    $500\Mpch$ subboxes of the \code{ph000} boxes, $\sim$576 samples, with its
+    open-boundary / non-independence / $\sim$10--20\% absolute caveats), unless an
+    \emph{externally pre-populated} galaxy mock suite (e.g.\ EZmocks) is adopted.
+    The ideal 1883 independent small-box covariance is therefore \emph{not}
+    available under the no-new-HOD constraint.  This is the main residual weakness
+    of Tier-3 as a measured-constraints path: the emulator fixes the derivatives,
+    but the covariance remains approximate.
+  \end{itemize}
 \item \textbf{Iterations.}  Run the full campaign at $\sim$10 ASTRA iterations to
   lower the per-vector noise floor (the random legs benefit).  The \emph{pilot}
   uses 3 iterations (cheap, $\sim$25 min, fits the 1-h queue limit) since the
