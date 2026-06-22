@@ -32,13 +32,14 @@ all 16 single quantile vectors and all 120 pairs, in two framings
 (standalone and added to the full auto), scoring each by the
 HOD-marginalised Fisher figure of merit.  The naive ranking is dominated by
 vectors containing a \emph{random}-quantile leg, with apparent gains up to
-$55\times$ (all of the global top~20 carry a random leg).  We trace this not to
-the randoms being noise --- their environment-classified \emph{monopoles} carry
-real cosmic-web signal --- but to their \emph{quadrupoles}, which have no
-peculiar-velocity (RSD) signal and whose noisy derivatives inflate the Fisher;
-flagging the random legs is thus a conservative choice pending derivative-noise
-propagation.  Among the clean \emph{data}-leg vectors the gains are
-real: adding a single full$\times$data-quantile cross buys $\sim\!5\times$ in
+$55\times$ (all of the global top~20 carry a random leg).  We test whether this
+is an artefact with two robustness checks --- propagating the derivative noise,
+and refitting with a nonlinear HOD response --- and find the random legs
+\emph{survive both}: their environment-classified monopoles carry real cosmic-web
+signal, and the gains are neither a noise nor a nonlinearity artefact (only
+$\sigma_8$ stays untrustworthy, limited by the nine-cosmology grid).  Among the
+\emph{data}-leg vectors --- a conservative subset --- the gains are
+already substantial: adding a single full$\times$data-quantile cross buys $\sim\!5\times$ in
 the three-parameter FoM, and a greedy forward selection that spans the four
 density quantiles reaches a five-stem vector
 (\code{full}$+$\code{xdQ1}$+$\code{dQ1}$+$\code{dQ2}$+$\code{xdQ3}$+$\code{dQ4})
@@ -246,7 +247,7 @@ bars is left for future work.  (The same GP idea, applied separately in each
 cosmology and evaluated at one common HOD point, is also how we can build
 ``HOD-matched'' derivatives, but that is beyond the scope of this note.)
 
-\section{The random-quadrupole trap}
+\section{Are the random legs an artefact? Two robustness tests}
 \label{sec:caveat}
 
 \begin{table}[t]
@@ -274,52 +275,89 @@ single-parameter test --- a warning sign examined in the text.}
 \end{tabular}
 \end{table}
 
-Table~\ref{tab:raw} and the bright \code{rQ4}/\code{xrQ4}/\code{xrQ1} band
-in Fig.~\ref{fig:heatmap} show that the naive sweep is dominated by vectors
-containing a random leg, with implausibly large gains ($\FoM_3$ up to
-$55\times$).  Taken at face value this would say the random-quantile statistics
-are the most powerful of all, which deserves scrutiny.  The key is to separate
-the monopole from the quadrupole; the trap is the \emph{quadrupole}, not the
-random statistic as a whole.
+Table~\ref{tab:raw} and the bright \code{rQ4}/\code{xrQ4}/\code{xrQ1} band in
+Fig.~\ref{fig:heatmap} show that the naive sweep is dominated by vectors
+containing a random leg ($\FoM_3$ up to $55\times$).  Taken at face value this
+says the random-quantile statistics are the most powerful of all.  Because that
+reverses every earlier single-parameter result, we treated it as a warning sign
+and ran two robustness tests.  The outcome, stated up front, is that the random
+legs \emph{survive} both: their gains are real signal, not an artefact.
 
-\begin{itemize}
-\item \textbf{The random-quantile monopoles carry real signal.}  Once the
-  uniform random points are classified by their Delaunay environment, the
-  overdense quantile genuinely sits in overdense regions and the underdense one
-  in voids.  Their auto-correlation therefore measures the clustering of the
-  cosmic-web \emph{environments} themselves --- a real, cosmology-dependent
-  quantity, not Poisson noise.  Indeed the extreme random monopoles are as
-  signal-rich as the data quantiles (\code{rQ1},\code{rQ4} $\ell0$ noise/signal
-  $\approx 0.05$--$0.09$).
-\item \textbf{The random-quantile quadrupoles are physically weak.}  The
-  quadrupole of the \emph{data} comes from peculiar velocities (redshift-space
-  distortions).  The random points have \emph{no} peculiar velocities, so their
-  quadrupole carries almost no real signal: the little anisotropy present is a
-  geometric byproduct of the classification and is dominated by realisation
-  noise (\code{rQ2/3} $\ell2$ noise/signal $\approx 0.7$--$0.8$).
-\item \textbf{The inflation is derivative noise in the quadrupole.}  A Fisher
-  matrix treats the derivative $D$ as exact; noise in $D$ that is not
-  represented in the covariance $C$ inflates $D\,C^{-1}D^{\mathsf T}$, so the
-  Fisher reads derivative noise as constraining power.  A mono$+$quad random
-  vector carries a signal-rich monopole \emph{and} a noise-limited quadrupole,
-  and it is the noisy quadrupole derivative that drives the spurious gains.  The
-  signature fits: a random vector is barely better than the full auto on its own
-  (\code{xrQ4} standalone $\FoM_3=1.6$) yet explodes when appended.
-\end{itemize}
+First, the relevant physics.  Once the uniform random points are classified by
+their Delaunay environment, the overdense quantile genuinely sits in overdense
+regions and the underdense one in voids, so the random-quantile \emph{monopoles}
+measure the clustering of the cosmic-web environments themselves --- a real,
+cosmology-dependent quantity, as signal-rich as the data quantiles
+(\code{rQ1},\code{rQ4} $\ell0$ noise/signal $\approx 0.05$--$0.09$), \emph{not}
+Poisson noise.  The random \emph{quadrupoles}, on the other hand, are physically
+weak: the data quadrupole comes from peculiar velocities, but the random points
+have none, so their quadrupole is dominated by realisation noise
+(\code{rQ2/3} $\ell2$ noise/signal $\approx 0.7$--$0.8$).  This raises two
+distinct worries about the random-leg gains, which we test in turn:
 
-So the caution is narrower than ``the randoms are noise''.  Their monopoles are
-genuine cosmic-web environment signal; it is the velocity-free quadrupoles, with
-their noisy derivatives, that inflate the Fisher --- and, because the randoms
-trace the \emph{same} density field as the data, large \emph{independent} gains
-are in any case implausible on redundancy grounds.  Flagging every random-leg
-candidate is therefore a \emph{conservative} choice, not a proof that they are
-worthless: it removes the quadrupole-noise inflation at the price of also setting
-aside the real random-monopole information.  The clean resolution is to propagate
-the (emulator) derivative variance, which would deflate the noisy quadrupole
-derivatives while keeping the genuine monopole signal (future work).  Until then
-we base the physical conclusions on the data legs only.
+\paragraph{Test 1 --- derivative noise (Fig.~\ref{fig:noiseaware}).}
+A Fisher matrix treats $D$ as exact; noise in $D$ adds
+$\mathrm{Tr}(C^{-1}\mathrm{Cov}(\delta))>0$, which it reads as constraining power.
+We estimate $\mathrm{Cov}(\delta)$ from the \emph{random} part of the global-fit
+slope (driven by the ASTRA-iteration scatter, $\sigma_{\rm astra}^2 =
+\overline{\mathrm{xi\_std}^2}/N_{\rm iter}$; the regression residual is not used,
+as it is dominated by HOD nonlinearity) and subtract the bias.  The full auto,
+being deterministic, has zero correction (a clean check).  The random legs deflate
+by only $\sim\!25$--$40\%$ and stay near the top (\code{xrQ4} $12.2\to7.7$,
+\code{rQ4} $8.6\to6.0$); the data legs deflate $\sim\!15\%$.  The reason is that
+the \emph{global} derivative averages the per-realisation noise over all 450
+phase-matched runs, so even the noise-limited quadrupoles have well-determined
+\emph{global} derivatives.  Derivative noise does not explain the gains.
 
-\section{The honest, data-leg ranking}
+\paragraph{Test 2 --- HOD nonlinearity (Fig.~\ref{fig:nonlinear}).}
+The global model is linear in the HOD, but the true response is mildly nonlinear,
+which could bias the jointly-fitted cosmology slope.  We refit with HOD quadratic
+terms ($\theta_{\rm HOD}^2$ and $\theta_{\rm HOD}\theta_{\rm HOD}$, centred at the
+fiducial; design condition number $46$).  The cosmology derivatives move by
+$\sim\!30$--$60\%$ --- but for \emph{all} stems, with the data legs moving as much
+as or \emph{more} than the random legs (data $0.32$--$0.60$ vs random
+$0.24$--$0.48$).  The $\FoM_3$ ranking is preserved, random legs still on top.
+Nonlinearity therefore does not preferentially bias the random legs.
+
+\medskip
+\noindent\textbf{Conclusion.}  The random-leg gains are neither a noise artefact
+(Test 1) nor a nonlinearity artefact (Test 2); driven by their signal-rich
+monopoles, they carry real, usable cosmological information.  Two caveats remain.
+\emph{(a)~$\sigma_8$:} the quadratic model is unstable for $\sigma_8$
+($\partial\xi/\partial\ln\sigma_8 / 2\xi$ goes $0.43\to-0.15$, unphysical) ---
+an overfit symptom of having only nine cosmologies to fix the cosmology
+directions, so $\sigma_8$ stays the one untrustworthy parameter and $\FoM_3$
+(which drops it) is our score.  \emph{(b)~Redundancy:} the randoms trace the same
+density field as the data, so their independent contribution is controlled by the
+data covariance (which includes the cross-correlations) --- this is already in the
+Fisher.  Given all this, the data-leg ranking in the next section is a
+\emph{conservative subset} (it omits the random legs to keep the headline simple
+and robust); including the now-vindicated random legs would only \emph{improve}
+the gains.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\textwidth]{noise_aware_ranking.png}
+\caption{Test 1.  Naive (grey) vs noise-aware (blue) $\FoM_3$ gain per single
+stem added to the full auto, after subtracting the derivative-noise bias
+$\mathrm{Tr}(C^{-1}\mathrm{Cov}(\delta))$ using the random ASTRA-iteration noise.
+The full auto is unchanged (zero derivative noise); the random legs ($\star$)
+deflate $\sim\!25$--$40\%$ but stay near the top --- they are not a noise artefact.}
+\label{fig:noiseaware}
+\end{figure}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\textwidth]{nonlinear_response.png}
+\caption{Test 2.  (a) Relative change in the cosmology derivative when HOD
+nonlinearity is added to the response model: data legs (green) move as much as or
+more than random legs (red).  (b) $\FoM_3$ ranking with linear vs nonlinear
+derivatives --- the random legs ($\star$) remain on top.  Nonlinearity does not
+single out the random legs.}
+\label{fig:nonlinear}
+\end{figure}
+
+\section{The conservative data-leg ranking}
 \label{sec:results}
 
 \begin{table}[t]
@@ -349,8 +387,10 @@ $\sigma(\sigma_8)=1.4\times10^{-2}$.}
 \end{tabular}
 \end{table}
 
-Restricting to data-leg candidates (Table~\ref{tab:clean},
-Fig.~\ref{fig:singles}) gives a clean and physically sensible picture:
+Restricting to data-leg candidates --- a conservative subset, since the random
+legs are vindicated in Sec.~\ref{sec:caveat} but omitted here for a simple,
+robust headline --- gives a clean and physically sensible picture
+(Table~\ref{tab:clean}, Fig.~\ref{fig:singles}):
 
 \begin{itemize}
 \item \textbf{Singles.}  The full$\times$data-quantile crosses at the
@@ -379,10 +419,10 @@ Fig.~\ref{fig:singles}) gives a clean and physically sensible picture:
 \centering
 \includegraphics[width=0.92\textwidth]{single_vector_gains.png}
 \caption{Single-vector $\FoM_3$ gain over the full auto, additive (blue) and
-standalone (grey), ranked.  Red stars mark random-leg vectors, whose additive
-gains are inflated by noise in their velocity-free quadrupole derivatives
-(Sec.~\ref{sec:caveat}).  Every vector is at or below the full-auto line on its
-own; the gain is degeneracy-breaking, realised only when appended.}
+standalone (grey), ranked.  Red stars mark random-leg vectors; these are tested
+and found robust (not artefacts) in Sec.~\ref{sec:caveat}.  Every vector is at or
+below the full-auto line on its own; the gain is degeneracy-breaking, realised
+only when appended.}
 \label{fig:singles}
 \end{figure}
 
@@ -392,9 +432,9 @@ own; the gain is degeneracy-breaking, realised only when appended.}
 \caption{Additive $\FoM_3$ gain for every pair, full auto $+$ stem$_i$ $+$
 stem$_j$ (diagonal $=$ single).  White lines separate the four families
 (\code{dQ}, \code{rQ}, \code{xdQ}, \code{xrQ}).  The bright band on the
-\code{rQ4}/\code{xrQ4}/\code{xrQ1} rows and columns is driven by the noisy
-random-quadrupole derivatives (Sec.~\ref{sec:caveat}); the data-leg quadrants
-(\code{dQ}, \code{xdQ}) show the modest, trustworthy gains.}
+\code{rQ4}/\code{xrQ4}/\code{xrQ1} rows and columns is from the random legs, which
+survive the robustness tests of Sec.~\ref{sec:caveat}; the data-leg quadrants
+(\code{dQ}, \code{xdQ}) are the conservative subset used for the headline.}
 \label{fig:heatmap}
 \end{figure}
 
@@ -403,8 +443,8 @@ random-quadrupole derivatives (Sec.~\ref{sec:caveat}); the data-leg quadrants
 \includegraphics[width=\textwidth]{per_parameter_best.png}
 \caption{For each cosmological parameter, the single ASTRA vectors that most
 improve its marginalised error when added to the full auto.  Green bars are
-data-leg vectors (trustworthy); red bars are random-leg vectors, whose gains lean
-on the noisy velocity-free quadrupole and are not yet trustworthy.}
+data-leg vectors; red bars are random-leg vectors, found robust to the
+derivative-noise and nonlinearity tests of Sec.~\ref{sec:caveat}.}
 \label{fig:perparam}
 \end{figure}
 
@@ -726,14 +766,17 @@ with the cumulative $\FoM_3$ at each step.}
 \begin{enumerate}
 \item The systematic sweep of all 16 singles and 120 pairs is dominated, at
   face value, by vectors with a random-quantile leg (gains up to $55\times$).
-  The cause is specifically the random \textbf{quadrupole}: the
-  environment-classified random \emph{monopoles} carry real cosmic-web signal,
-  but the random quadrupoles have no peculiar-velocity (RSD) signal and their
-  noisy derivatives inflate the Fisher.  Flagging the random legs is a
-  conservative choice (it also sets aside the real random-monopole information);
-  any ranking here must noise-correct the random quadrupole, e.g.\ by propagating
-  the derivative variance, before trusting those gains.
-\item Among the \textbf{trustworthy data legs}, the full$\times$data-quantile
+  We treated this as a warning sign and tested it two ways: subtracting the
+  derivative-noise bias (the random legs deflate only $\sim\!25$--$40\%$ and stay
+  on top), and refitting with a nonlinear HOD response (the cosmology derivatives
+  move $\sim\!30$--$60\%$ for \emph{all} stems, data legs as much as random).
+  The random legs survive both --- their environment-classified \emph{monopoles}
+  carry real cosmic-web signal, so the gains are neither a noise nor a
+  nonlinearity artefact (Sec.~\ref{sec:caveat}).  The one direction that stays
+  untrustworthy is $\sigma_8$, limited by the nine-cosmology grid.
+\item Among the \textbf{data legs} --- a conservative subset that omits the
+  (now-vindicated) random legs for a simple, robust headline ---
+  the full$\times$data-quantile
   crosses at the density extremes (\code{xdQ1}, \code{xdQ4}) are the best
   single additions ($\FoM_3$ gain $\approx 5$), and the best clean pair is
   the void data auto with the void data cross, \code{dQ1}$+$\code{xdQ1}
@@ -755,17 +798,15 @@ with the cumulative $\FoM_3$ at each step.}
   $2.4$--$3.6\times$ and is the dominant source of $\sigma_8$ information; its
   value is larger for the ASTRA splits than for the plain 2PCF
   (Sec.~\ref{sec:multipole}).
-\item \textbf{Next steps.}  (i) Propagate the GP emulator derivative variance
-  (calibrated with the $\sim\!1.25\times$ inflation measured separately) so the
-  noisy random-quadrupole derivatives are deflated and the random legs can be
-  ranked honestly --- this should recover the genuine random-monopole
-  information; (ii) use the higher-iteration runs to denoise the
-  random-quadrupole derivatives directly; (iii) revisit the four-parameter FoM once a
-  trustworthy $\sigma_8$ derivative is available; (iv) estimate the covariance
-  from many independent full boxes (e.g.\ the 25 AbacusSummit phases) before
-  quoting absolute error bars --- the relative rankings here are robust to the
-  $\sim\!6\%$ level (Sec.~\ref{sec:covrobust}), but the absolute $\sigma$ rely on
-  the subbox approximation.
+\item \textbf{Next steps.}  (i) Fold the now-vindicated random legs back into the
+  greedy chain and the optimal data vector (their signal-rich monopoles should add
+  beyond the data legs); (ii) settle $\sigma_8$ --- the only untrustworthy
+  direction --- which the nine-cosmology grid cannot pin down and which needs more
+  cosmologies, not reanalysis; (iii) estimate the covariance from many independent
+  full boxes (e.g.\ the 25 AbacusSummit phases) before quoting absolute error bars,
+  since the relative rankings are robust to the $\sim\!6\%$ level
+  (Sec.~\ref{sec:covrobust}) but the absolute $\sigma$ rely on the subbox
+  approximation.
 \end{enumerate}
 
 All numbers are reproduced by \code{scripts/fisher\_vector\_search.py} (the full
