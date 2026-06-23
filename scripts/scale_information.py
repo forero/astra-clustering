@@ -48,7 +48,7 @@ def subbox_block(stem, ell):
     for t in tags:
         f = REPO / 'data' / t / f'subbox_multipoles_{stem}.npz'
         if f.is_file():
-            x = np.load(f)[f'xi{ell}']
+            x = np.load(f)[f'xi{ell}_all']               # (n_subbox, nbins) per-subbox
             cols.append(x - x.mean(0))
     return np.vstack(cols)
 

@@ -50,8 +50,8 @@ def cv_box_per_column(blocks):
         for t in tags:
             f = REPO / 'data' / t / f'subbox_multipoles_{st}.npz'
             if f.is_file():
-                x = np.load(f)[f'xi{el}']
-                cols.append(x - x.mean(0))                # remove each cosmology's mean
+                x = np.load(f)[f'xi{el}_all']             # (n_subbox, nbins) per-subbox
+                cols.append(x - x.mean(0))                # remove each cosmology's per-bin mean
         X = np.vstack(cols)
         cv[sl] = X.std(0) / np.sqrt(64)
     return cv

@@ -80,7 +80,9 @@ astra-clustering/
 │   ├── plot_param_response_pairs.py ← single-parameter response (Fisher ± pairs), split void/peak
 │   ├── emulator_bakeoff.py       ← within-cosmology floor: MLP vs PCA+GP (cov-weighted, ratio)
 │   ├── binning_proxy.py          ← coarsening-trend proxy: does finer binning help the floor?
-│   └── emulator_data_vs_random.py← per-leg emulability (the floor is monopole-good vs quadrupole-bad)
+│   ├── emulator_data_vs_random.py← per-leg emulability (the floor is monopole-good vs quadrupole-bad)
+│   ├── emulator_monopole.py      ← monopole forward model + leave-one-cosmology-out validation
+│   └── inference_monopole.py     ← SUNBIRD-style recovery test (emulator + C_CV+C_emu + emcee)
 ├── queue/
 │   ├── run_single_box.sh         ← sbatch wrapper, single-box pipeline
 │   ├── run_subboxes.sh           ← sbatch wrapper, subbox pipeline
@@ -912,3 +914,38 @@ the cosmology spread is real (not HOD scatter — marginalised ≈ matched); ove
 LH it is multivariate (can't attribute to one param); ω_cdm is the cleanest/largest
 mover; σ₈/amplitude is bias-degenerate (low-σ₈ can give *higher* ξ at fixed n_density);
 void and knot respond differently to each parameter (the degeneracy-breaking, by eye).
+
+### CV-denominator bug fixed + monopole emulator + inference prototype (2026-06-23)
+
+**CV BUG (important):** the cosmic-variance helpers (`cv_box_per_column`,
+`scale_information.subbox_block`, `inference_monopole.subbox_cov`) read `xi0` (the (15,)
+per-cosmology *mean*) instead of `xi0_all` ((64,15) per-subbox). So "CV" was the std of
+9 cosmology-means/√64 (a cosmology-variation, 9 samples) rather than true cosmic variance
+(576 pooled per-subbox samples). **Fixed** to `xi0_all`. Consequence: every absolute
+"×CV" number logged above is off by ~0.6–5× per bin; **relative conclusions all hold**
+(same CV both sides — model tie, HOD plateau, monopole-vs-quadrupole, binning-not-a-lever,
+interp-vs-extrap) and RMS/spread numbers never used CV. Re-verify any absolute ×CV claim.
+Corrected monopole LOCO: **Fisher/LCDM-neighbourhood ~1.1×CV holds** (c000 1.0×, c104
+0.9× — genuinely inference-grade near LCDM, not a bug artifact); tier3 broad **18×CV**.
+
+**Monopole emulator** (`emulator_monopole.py`): MLP forward model over all 19 cosmologies,
+monopole legs; leave-one-cosmology-out → the inference-relevant gate. Fisher cosmologies
+~1.1×CV (interpolation), tier3 ~18×CV (extrapolation — needs the campaign).
+
+**Inference prototype** (`inference_monopole.py`): SUNBIRD recipe — emulator μ, C_tot =
+C_CV (subbox) + C_emu (Fisher-set LOCO residuals) [+ C_label for the real mock], emcee
+over the 4 LCDM params {ω_b,ω_c,h,n_s}, HOD fixed (prototype). 6 clean monopole legs
+(void DATA monopoles excluded: zero-crossing → CV→0 → pathological). Results:
+- **Synthetic mock** (μ(θ_inj displaced) + draw from C_CV+C_emu): χ²/dof=0.55, all 4
+  params recovered **<1σ** at the displaced truth → the sampler/likelihood/emulator-gradient
+  **machinery is validated**.
+- **Real c000 mock** (calibrated C_tot): χ²/dof=13.5 (was 18.5 before C_label),
+  ω_cdm −0.1σ, h +1.8σ, n_s −1.7σ (was −30σ/railed), ω_b +3.2σ. Much improved but not
+  clean — residual χ²≫1 is per-run emulator bias beyond the averaged C_emu, plus the
+  same-phase-mock limitation (no independent realisation under no-new-HOD).
+
+**Status:** monopole emulator+inference is BUILT and the machinery is validated; a clean
+*real* recovery is gated by emulator realism (→ campaign coverage) and independent-phase
+mocks (unavailable). Next levers unchanged: (1) full c130–c181 campaign at ≥10 iters for
+coverage + quadrupoles; (2) HOD marginalisation (currently fixed); (3) external EZmock-type
+covariance for an honest C and independent mocks.
