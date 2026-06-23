@@ -62,6 +62,7 @@ astra-clustering/
 │   ├── fisher_5stem_details.py   ← step-by-step anatomy of a multi-stem Fisher
 │   ├── fisher_multipole_compare.py← monopole vs quadrupole vs both
 │   ├── fisher_compare_full_vs_5stem.py ← 2PCF vs full+xrQ4+xrQ1 corner (FoM printed)
+│   ├── fisher_crosslegs_details.py← xrQ4/xrQ1 measured mono/quad, derivs, covariance
 │   ├── fisher_forecast_update.py ← noise-aware 3-way forecast corner
 │   ├── fisher_noise_aware.py     ← #1: subtract derivative-noise bias Tr(C⁻¹Covδ)
 │   ├── fisher_nonlinear_response.py ← #3: quadratic-in-HOD response, bias check
@@ -753,7 +754,11 @@ mono/quad), HOD-marginalised, pooled 576-subbox covariance.
   ω_b 5.2×, ω_c 7.6×, n_s 4.8×, σ8 2.7×. Just the **two void/knot random crosses**
   full+xrQ4+xrQ1 already give FoM3 48× (`fisher_compare_full_vs_5stem.py`).
   Workhorses = extreme-environment CROSSES. Forecast corner:
-  `fisher_forecast_update.py`.
+  `fisher_forecast_update.py`. **Why the two crosses work** (`fisher_crosslegs_details.py`):
+  xrQ4 (knot) and xrQ1 (void) are mirror-images — opposite measured ξ0 signs
+  (+0.50 vs −0.43), opposite cosmology-derivative signs, and ANTI-correlated in C
+  (full–xrQ4 block +, full–xrQ1 & xrQ4–xrQ1 blocks −) → two partially-independent
+  probes → strong Fisher leverage.
 - **THE gain is small-scale** (`fisher_scale_environment.py`): FoM3 210→20.6→4.4×
   at s>0/20/40 Mpc/h; s<40 band alone holds 143×, BAO/large ~1× — because ASTRA
   splits by local density and all quantiles cross zero together at large s. So the
