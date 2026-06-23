@@ -67,7 +67,10 @@ astra-clustering/
 │   ├── fisher_noise_aware.py     ← #1: subtract derivative-noise bias Tr(C⁻¹Covδ)
 │   ├── fisher_nonlinear_response.py ← #3: quadratic-in-HOD response, bias check
 │   ├── fisher_scale_environment.py← scale-cut survival + signature map (data+random)
-│   └── select_tier3_pilot.py     ← tier-3: maximin HODs for c130–c181 pilot
+│   ├── select_tier3_pilot.py     ← tier-3: maximin HODs for c130–c181 pilot
+│   ├── select_tier3_full.py      ← tier-3: maximin HODs for the full c130–c181 campaign (52 cosmo)
+│   ├── build_emulator_dataset.py ← cache tier3 + Fisher-anchor runs → data/emulator_tier3/*.npz
+│   └── emulator_tier3_mlp.py     ← tier-3 MLP emulator: LOCO + anchor, 8 diagnostics
 ├── queue/
 │   ├── run_single_box.sh         ← sbatch wrapper, single-box pipeline
 │   ├── run_subboxes.sh           ← sbatch wrapper, subbox pipeline
@@ -78,7 +81,10 @@ astra-clustering/
 │   ├── launch_hod_calibration.sh ← Tier-1: submits the selected c000 HOD-calibration full-box runs
 │   ├── launch_hod_ensemble.sh    ← global-response ensemble: 50 HODs × 9 cosmologies
 │   ├── launch_iter_experiment.sh ← higher-iteration runs → data/fullbox_iter10/
-│   └── launch_tier3_pilot.sh     ← tier-3 pilot: c130–c181 × 50 HODs → data/fullbox_tier3/
+│   ├── launch_tier3_pilot.sh     ← tier-3 pilot: c130–c181 × 50 HODs → data/fullbox_tier3/
+│   ├── run_emulator_tier3.sh     ← GPU sbatch wrapper for emulator_tier3_mlp.py
+│   ├── run_fullbox_array.sh      ← job-array runner (manifest-driven full-box pipeline)
+│   └── launch_tier3_full.sh      ← full campaign: skip-aware manifest + throttled overrun array
 ├── data/             ← pipeline output; subdirs {cosmo}_hod{NNN}/, fullbox/, derivatives/
 ├── plots/            ← figure output; mirrors the data/ layout
 ├── notes/            ← LaTeX technical notes (zero_crossing/, fisher/, vector_search/, tier3_emulator/)
@@ -790,3 +796,38 @@ Fisher *forecast* into *measured* constraints via a simulation-based MLP emulato
   sub-noise emulator accuracy at s<40, leave-one-cosmology-out. Next steps: build
   the c130–c181 cosmology-param table; train a prototype MLP once ≥3–4 cosmologies
   land.
+
+### Tier-3 MLP emulator: pilot reviewed + full campaign launched (2026-06-23)
+
+Design note `notes/tier3_emulator/mlp_emulator_note.{tex,pdf}`. Inputs = 20-D
+(8 varying cosmo params ω_b,ω_c,h,n_s,α_s,N_ur,w0,wa + 12 yuan23 HOD); targets =
+void/knot legs (randoms first, then data) mono+quad; split = **leave-one-cosmology-
+out** (≈76/14/10% *by cosmology*, not by run) + the 9 Fisher cosmologies as an
+external anchor. `build_emulator_dataset.py` caches all 17 stems×2ℓ×15 bins (510-D)
+once → `data/emulator_tier3/{dataset,dataset_anchor}.npz` so retraining masks
+columns, never re-globs. `emulator_tier3_mlp.py` = torch MLP (noise-weighted MSE,
+5-model ensemble), 10-fold LOCO + anchor, 8 diagnostics → `plots/emulator_tier3/`.
+
+- **Pilot result (500 runs, 10 cosmologies): machinery validated, NOT yet accurate
+  enough — no-go at pilot scale.** Predictions are physical and 7/10 folds beat the
+  mean (RMS/spread 0.11–0.49), but vs **cosmic variance at the 2 Gpc/h box** the
+  LOCO error is ~40–130× too large on the priority random void/knot legs. Diagnosis:
+  the **sparse cosmology axis** (9 training cosmologies over 8-D → LOCO is mostly
+  *extrapolation*) — hull-edge cosmologies are worse-than-mean (c160 2.8×, c155
+  1.7×, c145 1.3×), hull-center fine (c165 0.11×); the anchor c000 (inside the hull)
+  is predicted well = interpolation works, extrapolation fails. HODs are already
+  well-sampled → **adding cosmologies, not HODs, is the lever.**
+- **Yardstick caveat:** the ASTRA per-iteration noise is a far-too-stringent
+  denominator on a 4M-galaxy box; the inference-relevant comparison is cosmic
+  variance (subbox C/64), as above. For inference: emulator = forward model μ(θ)
+  only; covariance from **simulations** (subbox C_CV) + additive C_emu from **LOCO
+  residuals** (not the ensemble spread) — this is the SUNBIRD approach.
+- **Full campaign launched 2026-06-23** (`select_tier3_full.py`,
+  `run_fullbox_array.sh`, `launch_tier3_full.sh`): all **52 cosmologies c130–c181 ×
+  100 maximin HODs × 3 iters** = 5200 runs → `data/fullbox_tier3/` (pilot's 500
+  reused — maximin is prefix-stable). Submitted as one throttled **job array**
+  `54892798` (1-4700%500). **Ran on the `overrun` qos** because forero's *per-user*
+  desi balance (~535 node-hr) is far below the ~4700 node-hr cost (repo has 174k —
+  it's a personal cap); overrun is free/low-priority/preemptible and `--requeue` +
+  per-task skip-logic make it safe. Resumable: re-run `launch_tier3_full.sh`.
+  Expect days–weeks. When done: rebuild cache → `run_emulator_tier3.sh` → review.

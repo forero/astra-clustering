@@ -1,0 +1,143 @@
+\documentclass[11pt]{article}
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{amsmath}\usepackage{amssymb}\usepackage{graphicx}
+\usepackage{booktabs}\usepackage{hyperref}
+\newcommand{\Mpch}{\,h^{-1}\,\mathrm{Mpc}}
+\newcommand{\code}[1]{\texttt{#1}}
+\title{Design note: the Tier-3 ASTRA MLP emulator --- dataset, splits, and diagnostics}
+\author{ASTRA clustering project}\date{June 2026}
+\begin{document}\maketitle
+
+\begin{abstract}
+This note specifies the first MLP emulator built on the Tier-3 pilot
+(\code{data/fullbox\_tier3/}: 10 cosmologies $\times$ 50 HODs, all complete). It
+fixes the emulator \emph{inputs}, the \emph{target} data vector (prioritising the
+void/knot environments from the randoms, then the data, in monopole and
+quadrupole), the \emph{cached dataset} that decouples slow disk reads from fast
+retraining, the \emph{train/validation/test split} (leave-one-cosmology-out, not
+a random split), the \emph{architecture}, and the \emph{diagnostic plots}. It is
+the companion to \code{tier3\_emulator\_note.tex} (which sets the campaign
+strategy); this note is the operational recipe the code implements.
+\end{abstract}
+
+\section{Inputs (20-D)}
+The emulator maps $\theta = (\theta_{\rm cosmo},\theta_{\rm HOD}) \mapsto
+\xi(s)$. The Tier-3 block \code{c130}--\code{c181} varies the broader
+$w_0w_a$CDM$+$ set, so the cosmology input is \textbf{8 varying parameters}
+(read from \code{data/abacus\_cosmologies\_params.csv}):
+\[
+\omega_b,\ \omega_{\rm cdm},\ h,\ n_s,\ \alpha_s,\ N_{\rm ur},\ w_0,\ w_a .
+\]
+($A_s$ and $\omega_{\rm ncdm}$ are fixed across the block; $\sigma_8$ is a
+derived quantity and is kept as a label, not an input, to avoid collinearity.)
+The HOD input is the \textbf{12 yuan23 parameters} already used throughout the
+project: \code{LOGM\_CUT, LOGM1, SIGMA, ALPHA, KAPPA, ALPHA\_C, ALPHA\_S, S,
+ACENT, ASAT, BCENT, BSAT}. Total input dimension \textbf{20}. All inputs are
+standardised (zero mean, unit variance over the training set).
+
+\section{Targets}
+The science priority is the \textbf{extreme environments} --- voids (Q1) and
+knots (Q4) --- \textbf{mostly from the randoms}, then from the data, in both
+multipoles. The primary target legs are therefore
+\[
+\{\code{rand\_q1},\ \code{rand\_q4},\ \code{cross\_full\_rand\_q1},\ \code{cross\_full\_rand\_q4}\}
+\]
+followed by the data twins
+$\{\code{data\_q1},\code{data\_q4},\code{cross\_full\_data\_q1},\code{cross\_full\_data\_q4}\}$,
+each in $\ell=0$ and $\ell=2$. The current pilot multipoles are stored on the
+coarse 15-bin $0$--$150\Mpch$ grid ($\sim 10\Mpch$ bins); the fine small-scale
+binning the strategy note calls for would require a pipeline re-run and is
+deferred. We train on the bins on disk and report accuracy as a function of a
+scale cut $s_{\rm cut}$ so the small-scale ($s<40\Mpch$) payoff region is read
+off directly.
+
+\section{Cached dataset --- the key to cheap retraining}
+We will retrain many times (different target subsets, architectures,
+PCA truncations, loss weights). Re-globbing $\sim$1000 run directories each time
+is wasteful, so a one-shot builder
+(\code{scripts/build\_emulator\_dataset.py}) writes a single compact archive
+\code{data/emulator\_tier3/dataset.npz} holding the \emph{full} stem set --- all
+17 stems $\times\,2$ multipoles $\times\,15$ bins (510-D) --- even though the
+first model trains on the void/knot subset. Arrays:
+\begin{itemize}
+\item \code{X\_cosmo} $(N,8)$, \code{X\_hod} $(N,12)$ --- standardisable inputs;
+\item \code{Y} $(N,510)$ --- concatenated $[\xi_0,\xi_2]$ over stems;
+\item \code{Ynoise} $(N,510)$ --- per-bin ASTRA-iteration scatter (\code{xi*\_std});
+\item \code{s} (15,), \code{stem\_labels}, \code{ell\_labels}, \code{bin\_index} --- block bookkeeping;
+\item \code{cosmo\_id}, \code{hod\_id}, \code{sigma8} --- per-row metadata for grouping/plots.
+\end{itemize}
+Target selection at train time is a column mask over \code{Y}; no disk re-read.
+The same builder writes \code{dataset\_anchor.npz} from the 450 Fisher-grid runs
+(\code{data/fullbox/}, cosmologies \code{c000,c100--c105,c112,c113}), which are
+\emph{not} in the training block and serve as an independent generalisation
+anchor in the LCDM neighbourhood.
+
+\section{Train / validation / test split}
+The decisive structural fact: there are only \textbf{10 cosmologies} but 500
+runs. A random split over runs would place HODs of the same cosmology in both
+train and test, leaking the (sparse, hard) cosmology axis and giving an
+optimistic score. In deployment the emulator predicts at \emph{new}
+cosmologies, so the split is made \textbf{along the cosmology axis}:
+\begin{itemize}
+\item \textbf{Headline: 10-fold leave-one-cosmology-out (LOCO).} Each fold trains
+  on 9 cosmologies (450 runs) and tests on the held-out one (50 runs); rotating
+  over folds tests every cosmology. This is the go/no-go metric.
+\item \textbf{Inner validation:} within each fold's 9 training cosmologies,
+  $\sim$15\% of the HODs (drawn across all 9, fixed seed) are held out for
+  early-stopping and hyperparameter choices.
+\item \textbf{Per-fold fractions} $\approx$ 76\% train / 14\% validation / 10\%
+  test, partitioned by cosmology --- \emph{not} a random 70/15/15 over runs.
+\item \textbf{External anchor:} the 450 Fisher-grid runs, never trained on, give
+  a second test set in the dense LCDM region we ultimately care about.
+\end{itemize}
+LOCO is chosen over a fixed permanent holdout because 10 cosmologies is too few
+to also sacrifice a standalone test block.
+
+\section{Architecture}
+SUNBIRD-style feed-forward MLP in \code{torch} (2.10, CUDA available):
+\begin{itemize}
+\item Input 20-D (standardised) $\to$ 3--4 hidden layers (256--512 units, SiLU)
+  $\to$ output;
+\item \textbf{Output via PCA} ($\sim$10--20 components on the standardised target
+  vector) for a compact, decorrelated regression target;
+\item \textbf{Noise-weighted MSE} loss, weight $1/\sigma_{\rm noise}^2$ per bin,
+  for the pilot. (The covariance-weighted loss that matches the inference metric
+  is the eventual goal, but the covariance is the known weak point of Tier-3, so
+  we start diagonal.)
+\item \textbf{Ensemble} of $\sim$5 independently-seeded MLPs for the emulator
+  uncertainty (used in the pull/calibration diagnostic);
+\item Adam, early stopping on the inner validation loss.
+\end{itemize}
+
+\section{Diagnostic plots}
+Acceptance is judged per $s$-bin against two yardsticks already used at Tier-2:
+the \textbf{ASTRA noise floor} (mean per-iteration $\xi_{\rm std}$, which no
+emulator should be expected to beat) and the \textbf{signal spread} (std of the
+training vectors, i.e.\ what there is to learn). A good emulator has
+LOCO~RMS~$\sim$~noise floor and $\ll$~spread, especially at $s<40\Mpch$. Plots:
+\begin{enumerate}
+\item \textbf{Learning curves} --- train/validation loss vs epoch, per fold (overfit check).
+\item \textbf{LOCO prediction vs truth} --- $s^2\xi$ for void/knot, data \& random,
+  $\ell=0,2$, on the held-out cosmology.
+\item \textbf{Error vs yardstick} --- per-bin LOCO RMS against noise floor and
+  signal spread vs $s$, zoomed to $s<40\Mpch$ (the acceptance plot).
+\item \textbf{Pull histograms} --- $(\hat\xi-\xi)/\sigma_{\rm ens}$ should be
+  $\mathcal N(0,1)$ (ensemble-uncertainty calibration).
+\item \textbf{Accuracy vs scale cut} --- RMS/noise integrated for $s<s_{\rm cut}$,
+  directly answering ``sub-noise at $s<40$''.
+\item \textbf{Fractional-error heatmap} --- (stem $\times\,\ell$) vs $s$-bin,
+  colour $=$ median $|$frac.\ error$|$; an at-a-glance map (expect random
+  quadrupoles weakest, per prior findings).
+\item \textbf{External-anchor prediction vs truth} --- the same curves on the 9
+  Fisher cosmologies.
+\end{enumerate}
+
+\section{Caveats}
+Ten cosmologies over an 8-D cosmology input is thin: a poor LOCO result means
+``need the full \code{c130}--\code{c181}$\times$120 campaign,'' not ``ASTRA
+fails.'' The coarse 15-bin grid limits the very small-scale resolution that
+carries most of the Fisher signal. The HOD response is assumed smooth and the
+ASTRA-iteration noise (3 iterations in the pilot) sets a floor the emulator
+cannot cross. These are the questions the diagnostics are designed to expose.
+
+\end{document}
