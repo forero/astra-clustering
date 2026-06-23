@@ -44,20 +44,20 @@ def main():
 
     an = emu.load('dataset_anchor.npz')
     mask, blocks = emu.select_targets(an, emu.PRIMARY_STEMS)
-    sel = np.where(an['cosmo'] == COSMO)[0]
-    print(f'{COSMO}: {len(sel)} runs on disk')
-    if len(sel) < 60:
-        print('Need ~100 c000 runs; rebuild the cache after the extra runs finish.')
-        return
-    X = an['X'][sel]
-    Y, Ynoise = an['Y'][sel][:, mask], an['Ynoise'][sel][:, mask]
+    cmask = an['cosmo'] == COSMO
+    X = an['X'][cmask]
+    Y, Ynoise = an['Y'][cmask][:, mask], an['Ynoise'][cmask][:, mask]
+    hod = an['hod'][cmask]
     cv = cv_box_per_column(blocks)
     pri = np.concatenate([np.r_[sl] for st, el, sl in blocks if st in PRIORITY])
 
+    # fixed held-out test set; training pool = the rest.  With all 100 c000 runs
+    # this lets K go past 50 -> directly tests whether the floor keeps dropping.
     rng = np.random.default_rng(0)
-    perm = rng.permutation(len(sel))
-    test = perm[:N_TEST]                                  # fixed held-out test set
-    pool = perm[N_TEST:]                                  # training pool
+    perm = rng.permutation(len(hod))
+    test = perm[:N_TEST]
+    pool = perm[N_TEST:]
+    print(f'{COSMO}: {len(hod)} runs; train pool = {len(pool)}, fixed test = {len(test)}')
     Ks = [k for k in (10, 20, 30, 40, 50, 60, 70) if k <= len(pool)]
 
     pri_m, pri_s, all_m = [], [], []
@@ -82,10 +82,11 @@ def main():
     ax.plot(Ks, all_m, 's-', color='C3', lw=1.5, alpha=0.7, label='all target legs')
     ax.axhline(1, color='grey', ls='--', lw=1, label='cosmic variance (inference target)')
     ax.axhline(8, color='C1', ls=':', lw=1, label='earlier ~8×CV floor (50 HODs)')
-    ax.set_yscale('log'); ax.set_xlabel('number of training HODs (c000, fixed test)')
+    ax.set_yscale('log')
+    ax.set_xlabel('number of training HODs (c000; independent test = new runs)')
     ax.set_ylabel('held-out median RMS / CV(box)')
-    ax.set_title('c000 within-cosmology HOD learning curve\n'
-                 'still falling at K=70 → more HODs help; flat → floor is bins/architecture')
+    ax.set_title(f'c000 within-cosmology HOD learning curve (test = {len(test)} new runs)\n'
+                 'still falling at the largest K → more HODs help; flat → floor is bins/architecture')
     ax.legend(fontsize=8); fig.tight_layout()
     p = REPO / 'plots/emulator_tier3/mlp_c000_hod_curve.png'
     fig.savefig(p, dpi=140, bbox_inches='tight'); plt.close(fig)

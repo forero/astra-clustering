@@ -75,7 +75,12 @@ astra-clustering/
 │   ├── emulator_tier3_within_cosmo.py   ← within-cosmology HOD-interp floor (no cosmo extrapolation)
 │   ├── select_extra_hods.py      ← pick N more maximin HODs extending an existing selection
 │   ├── emulator_c000_hod_curve.py← c000 held-out error vs #training HODs (fixed test)
-│   └── scale_information.py       ← most-informative spatial scales (cosmology signal vs CV/HOD per s-bin)
+│   ├── scale_information.py       ← most-informative spatial scales (cosmology signal vs CV/HOD per s-bin)
+│   ├── plot_cosmology_dependence.py ← legs vs cosmology at ~fixed/marginalised HOD, coloured by params
+│   ├── plot_param_response_pairs.py ← single-parameter response (Fisher ± pairs), split void/peak
+│   ├── emulator_bakeoff.py       ← within-cosmology floor: MLP vs PCA+GP (cov-weighted, ratio)
+│   ├── binning_proxy.py          ← coarsening-trend proxy: does finer binning help the floor?
+│   └── emulator_data_vs_random.py← per-leg emulability (the floor is monopole-good vs quadrupole-bad)
 ├── queue/
 │   ├── run_single_box.sh         ← sbatch wrapper, single-box pipeline
 │   ├── run_subboxes.sh           ← sbatch wrapper, subbox pipeline
@@ -871,3 +876,39 @@ Resume with `launch_tier3_full.sh` once the floor below is understood.
 - **c000 +50 HODs** (`select_extra_hods.py` → 100 total, array on regular qos): the
   HOD-count test of whether the ~8× floor is HOD-sample-limited — run
   `emulator_c000_hod_curve.py` once the 100 runs land.
+
+### FLOOR RESOLVED — it is monopole-vs-quadrupole, not a wall (2026-06-23)
+
+Follow-up tests overturned the "binning is the wall" reading:
+- **HOD-count to K=70** (`emulator_c000_hod_curve.py`, 100 c000 HODs): floor plateaus
+  by K≈30 at ~7×CV — HOD count definitively not the limiter.
+- **Model bake-off** (`emulator_bakeoff.py`): MLP ≈ PCA+Ridge ≈ PCA+GP, all ~6–8×CV —
+  model/loss/representation not the limiter. (Impl: literal ratio xi/xi_ref blows up
+  at the zero-crossing → amplitude-factored difference + diagonal cov-weighting; full
+  240-D cov-whitening unstable as pooled C is not PD.)
+- **Binning proxy** (`binning_proxy.py`): rebin existing data 3→15 bins. RMS/CV looked
+  U-shaped (upturn at 15) but in **RMS/spread the upturn vanishes** and the curve is
+  ~flat (~9% over 50→10 Mpc/h) → the upturn was a noisy-CV-denominator artifact, finer
+  binning is **not** a strong lever, and the true floor is ~5×CV (not 8×). **Fine-bin
+  recompute ruled out.**
+- **Data-vs-random split** (`emulator_data_vs_random.py`): the real structure is
+  **MONOPOLE vs QUADRUPOLE**. ℓ0 (data *and* random) ~1.5×CV — inference-ready, several
+  AT/BELOW cosmic variance (data_q4 ℓ0 0.3×, xd_q4 ℓ0 0.5×, xr_q4 ℓ0 1.2×). ℓ2 ~7–20×CV
+  = the whole floor (worst xr_q1 ℓ2 20×). The "~6–8× floor" was great monopoles averaged
+  with bad quadrupoles; the **quad floor is the 3-iteration ASTRA noise** on the RSD
+  signal (matches the iteration experiment), not binning/model/HOD.
+
+**Decision:** (1) a **monopole-only emulator + inference is buildable now** (~1.5×CV;
+monopoles carry the small-scale cosmology info); (2) recovering the quadrupole/RSD info
+needs a **higher-iteration (~10–25) recompute**, the validated lever — a resumed campaign
+should run ≥10 iters, not 3. Fine binning is off the table.
+
+### Cosmology-dependence visualisations (2026-06-23)
+
+`plot_cosmology_dependence.py` (legs vs cosmology at ~fixed or HOD-marginalised HOD,
+coloured by a parameter) and `plot_param_response_pairs.py` (clean single-parameter
+response from the Fisher ± pairs, split void/peak) → `plots/emulator_tier3/`. Findings:
+the cosmology spread is real (not HOD scatter — marginalised ≈ matched); over the broad
+LH it is multivariate (can't attribute to one param); ω_cdm is the cleanest/largest
+mover; σ₈/amplitude is bias-degenerate (low-σ₈ can give *higher* ξ at fixed n_density);
+void and knot respond differently to each parameter (the degeneracy-breaking, by eye).
