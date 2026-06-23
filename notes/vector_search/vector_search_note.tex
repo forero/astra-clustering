@@ -557,6 +557,55 @@ $\sigma_8\,1.2\times$).  The FoM is printed on the figure.}
 \label{fig:corner}
 \end{figure}
 
+\subsection*{Why the two cross legs are so powerful}
+
+It is worth opening up \emph{why} two statistics achieve this, because it is a
+clean physical story (\code{scripts/fisher\_crosslegs\_details.py}).
+Figure~\ref{fig:crosslegs} lays out the three Fisher ingredients for the two cross
+legs: the measured monopole and quadrupole, the cosmology derivatives, and the
+covariance.  The key is that \code{xrQ4} (full sample $\times$ knot-environment
+randoms) and \code{xrQ1} (full $\times$ void randoms) are near \emph{mirror
+images}:
+\begin{itemize}
+\item \textbf{Opposite measured signal.}  The full sample correlates
+  \emph{positively} with the overdense (knot) random regions and \emph{negatively}
+  with the voids: at $s\!\sim\!15\Mpch$, $\xi_0(\code{xrQ4})=+0.50$ while
+  $\xi_0(\code{xrQ1})=-0.43$ (Fig.~\ref{fig:crosslegs}, row~1).
+\item \textbf{Opposite cosmology response.}  Their derivatives flip sign in step
+  with the signal --- e.g.\ $\partial\xi_0/\partial\ln\omega_c = -0.60$ for
+  \code{xrQ4} versus $+0.48$ for \code{xrQ1} --- and the monopole and quadrupole
+  responses (rows~2--3) are likewise near-antisymmetric.
+\item \textbf{Anti-correlated noise.}  In the covariance
+  (Fig.~\ref{fig:crosslegs2}) the \code{full}--\code{xrQ4} block is positively
+  correlated, while the \code{full}--\code{xrQ1} and \code{xrQ4}--\code{xrQ1}
+  blocks are \emph{negative}: the knot and void crosses are anti-correlated.
+\end{itemize}
+So the two legs are partially-independent, mirror-image probes of the
+environment--density relation (overdense vs underdense), with signals \emph{and}
+parameter responses pointing in opposite directions while anti-correlated in the
+noise.  The Fisher combines such a pair with strong leverage --- which is why
+\code{full}$+$\code{xrQ4}$+$\code{xrQ1} already reaches $\FoM_3=48\times$.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\textwidth]{crosslegs_data_derivatives.png}
+\caption{The two cross legs \code{xrQ4} (knot) and \code{xrQ1} (void).  Row 1: the
+measured monopole and quadrupole $s^2\xi_{0,2}$ (\code{c000} fiducial) --- opposite
+in sign.  Rows 2--3: the cosmology derivatives $s^2\,\partial\xi_{0,2}/\partial
+\theta$ --- near-antisymmetric between the two legs.}
+\label{fig:crosslegs}
+\end{figure}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.62\textwidth]{crosslegs_covariance.png}
+\caption{Correlation matrix of \code{full}$+$\code{xrQ4}$+$\code{xrQ1} (pooled
+576-subbox $C$).  The \code{full}--\code{xrQ4} block is positive (red); the
+\code{full}--\code{xrQ1} and \code{xrQ4}--\code{xrQ1} blocks are negative (blue)
+--- the void and knot crosses are anti-correlated, hence partially independent.}
+\label{fig:crosslegs2}
+\end{figure}
+
 \section{Anatomy of the 5-stem Fisher computation}
 \label{sec:anatomy}
 
@@ -1026,6 +1075,7 @@ the all-stems chain of Secs.~\ref{sec:caveat} and \ref{sec:allstems} use
 and \code{scripts/fisher\_greedy\_chain\_all.py}; the updated forecast and the
 scale/environment decomposition of Secs.~\ref{sec:allstems} and \ref{sec:scale}
 use \code{scripts/fisher\_forecast\_update.py} and
-\code{scripts/fisher\_scale\_environment.py}.
+\code{scripts/fisher\_scale\_environment.py}; the cross-leg anatomy
+(Sec.~\ref{sec:greedy}) uses \code{scripts/fisher\_crosslegs\_details.py}.
 
 \end{document}
