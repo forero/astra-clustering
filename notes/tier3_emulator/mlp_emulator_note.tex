@@ -2,9 +2,10 @@
 \usepackage[margin=2.5cm]{geometry}
 \usepackage{amsmath}\usepackage{amssymb}\usepackage{graphicx}
 \usepackage{booktabs}\usepackage{hyperref}
+\graphicspath{{../../plots/emulator_tier3/}}
 \newcommand{\Mpch}{\,h^{-1}\,\mathrm{Mpc}}
 \newcommand{\code}[1]{\texttt{#1}}
-\title{Design note: the Tier-3 ASTRA MLP emulator --- dataset, splits, and diagnostics}
+\title{The Tier-3 ASTRA MLP emulator --- design, floor investigation, and inference prototype}
 \author{ASTRA clustering project}\date{June 2026}
 \begin{document}\maketitle
 
@@ -139,5 +140,222 @@ fails.'' The coarse 15-bin grid limits the very small-scale resolution that
 carries most of the Fisher signal. The HOD response is assumed smooth and the
 ASTRA-iteration noise (3 iterations in the pilot) sets a floor the emulator
 cannot cross. These are the questions the diagnostics are designed to expose.
+
+%======================================================================
+\section{Results I: the floor investigation}
+The pilot was run and the diagnostics above executed. The headline question
+``can a monopole+quadrupole emulator reach inference-grade accuracy?'' decomposed,
+through a sequence of cheap tests, into a clear and ultimately encouraging picture.
+All ``$\times$CV'' numbers are ratios of the held-out RMS to the cosmic-variance
+standard deviation at the $2\Mpch$\,Gpc box volume (see the \emph{CV correction}
+subsection below for an important denominator fix).
+
+\subsection{The pilot is extrapolation-limited, not broken}
+Leave-one-cosmology-out training gives physical predictions and 7/10 folds beat the
+mean, but the held-out error is large and \emph{varies enormously by cosmology}:
+hull-centre cosmologies are predicted well, hull-edge ones badly. The learning curve
+versus the number of training cosmologies (Fig.~\ref{fig:lc}) is essentially flat
+across the 2--9 cosmologies the pilot can probe --- but those ten cosmologies are
+spread every fifth point over the $w_0w_a$CDM hull, so this test cannot probe the
+\emph{density} the full campaign would add. The conclusion is that the pilot is
+\textbf{cosmology-extrapolation limited}: the cosmology axis is too sparsely sampled,
+not that the method fails.
+
+\begin{figure}[h]\centering
+\includegraphics[width=0.62\textwidth]{mlp_learning_curve_vs_ncosmo.png}
+\caption{Held-out error versus number of training cosmologies (robust median over
+random subsets; RMS/spread panel is CV-estimate-noise-free). Flat across 2--9
+cosmologies: at the pilot's sparse spacing, adding points does not shrink the
+inter-cosmology gaps. The campaign changes the \emph{density}, which this proxy
+cannot see.}
+\label{fig:lc}
+\end{figure}
+
+\subsection{Ruling out the suspects}
+A within-cosmology test (5-fold over each cosmology's HODs, \emph{zero} cosmology
+extrapolation) isolates a second, smaller floor (Fig.~\ref{fig:within}). We then
+eliminated its candidate causes one by one:
+\begin{itemize}
+\item \textbf{HOD sample size --- ruled out.} The within-cosmology floor plateaus by
+  $\sim$30 training HODs and does not improve out to 70 (we ran \code{c000} to 100
+  HODs to check; Fig.~\ref{fig:hodcurve}).
+\item \textbf{Model class / loss / representation --- ruled out.} A bake-off of the
+  MLP against a PCA$+$GP (covariance-weighted, amplitude-factored residual target)
+  and a PCA$+$Ridge all tie (Fig.~\ref{fig:bakeoff}).
+\item \textbf{Iteration noise --- ruled out} earlier (emulator error $\gg$ the ASTRA
+  per-iteration scatter).
+\item \textbf{Binning --- ruled out.} A zero-compute coarsening proxy (rebin the
+  existing data to 3--15 bins) shows the modelling-quality metric (RMS/spread,
+  immune to CV-estimate noise) is flat with resolution (Fig.~\ref{fig:binproxy});
+  the apparent gain toward finer bins in RMS/CV is a noisy-denominator artifact.
+  Finer binning is therefore \emph{not} a strong lever.
+\end{itemize}
+
+\begin{figure}[h]\centering
+\includegraphics[width=0.74\textwidth]{mlp_within_cosmo_floor.png}
+\caption{Within-cosmology HOD-interpolation floor per cosmology (zero cosmology
+extrapolation). A uniform residual floor remains even with no extrapolation; its
+cause is isolated in the following tests.}
+\label{fig:within}
+\end{figure}
+
+\begin{figure}[h]\centering
+\includegraphics[width=0.49\textwidth]{mlp_c000_hod_curve.png}\hfill
+\includegraphics[width=0.49\textwidth]{emulator_bakeoff.png}
+\caption{\emph{Left:} \code{c000} held-out error vs.\ number of training HODs
+(100 HODs available): plateaus by $\sim$30 --- HOD count is not the limiter.
+\emph{Right:} model bake-off, within-cosmology floor per cosmology --- MLP,
+PCA$+$Ridge and PCA$+$GP tie, so model/loss/representation is not the limiter.}
+\label{fig:hodcurve}\label{fig:bakeoff}
+\end{figure}
+
+\begin{figure}[h]\centering
+\includegraphics[width=0.85\textwidth]{binning_proxy.png}
+\caption{Coarsening-trend proxy. RMS/CV (left) is U-shaped, but the upturn at the
+finest bins vanishes in RMS/spread (right), which is flat --- so the upturn was a
+CV-denominator artifact and finer binning is not a strong lever ($\lesssim$10\% over
+$50\!\to\!10\Mpch$, far short of the order-of-magnitude needed).}
+\label{fig:binproxy}
+\end{figure}
+
+\subsection{Resolution: the floor is monopole-vs-quadrupole}
+Splitting the within-cosmology floor by leg (Fig.~\ref{fig:dvr}) reveals the real
+structure: it is not data-vs-random but \textbf{monopole-vs-quadrupole}. The
+\emph{monopoles} (both data and random) emulate well, several at or below cosmic
+variance; the \emph{quadrupoles} carry the entire floor. This matches the
+independent iteration experiment (random quadrupoles are noise-limited at 3
+iterations, improving toward 10): \textbf{the quadrupole floor is the 3-iteration
+ASTRA label noise on the velocity-dependent $\ell=2$ signal}, not binning, model, or
+HOD count. The ``$\sim$6--8$\times$ floor'' quoted from aggregate metrics was great
+monopoles averaged with noisy quadrupoles.
+
+\begin{figure}[h]\centering
+\includegraphics[width=0.95\textwidth]{data_vs_random.png}
+\caption{Per-leg within-cosmology emulability. The split is monopole (good) vs
+quadrupole (bad), in \emph{both} data and random families. Monopoles are the
+inference-ready legs; the quadrupole floor is iteration-noise-limited.}
+\label{fig:dvr}
+\end{figure}
+
+\subsection{A CV-denominator correction}
+While building the inference test we found a bug in the cosmic-variance helpers:
+they read the per-cosmology \emph{mean} multipole (\code{xi0}, 9 samples) instead of
+the per-subbox array (\code{xi0\_all}, 576 pooled samples), so ``CV'' was a
+cosmology-variation, not cosmic variance. After the fix every absolute $\times$CV
+number shifts by $\sim$0.6--5$\times$ per bin, but \emph{all relative conclusions
+above hold} (they compare ratios with the same denominator on both sides), as do the
+RMS/spread results (which never use CV). The corrected absolute numbers are quoted in
+the next section.
+
+%======================================================================
+\section{Results II: most-informative scales and cosmology response}
+Two model-free diagnostics characterise where the cosmological information lives and
+how the legs respond to cosmology, using all 19 cosmologies on disk.
+
+\paragraph{Scale.} A cumulative-information analysis (Fig.~\ref{fig:scale}) shows the
+\textbf{monopole} cosmological information is concentrated at \textbf{small scales}
+($\sim$50\% by $s\!\approx\!30$--$55\Mpch$), while the \textbf{quadrupole}
+information sits at \textbf{large scales} ($\gtrsim100\Mpch$, the Kaiser regime).
+Small scales carry both the highest cosmology signal and the highest HOD nuisance ---
+which is why the emulator is needed there.
+
+\paragraph{Response.} Single-parameter Fisher $\pm$ pairs (Fig.~\ref{fig:resp}),
+HOD-marginalised and split by environment, give the clean attribution the broad
+Latin-hypercube cannot: $\omega_{\rm cdm}$ is the largest, cleanest mover;
+$\sigma_8$/amplitude is bias-degenerate (at fixed number density a \emph{lower}
+$\sigma_8$ can give a \emph{higher} $\xi$); and void and knot respond
+\emph{differently} to each parameter --- the degeneracy-breaking that motivates
+ASTRA, visible by eye.
+
+\begin{figure}[h]\centering
+\includegraphics[width=0.6\textwidth]{scale_information_cumulative.png}
+\caption{Cumulative cosmology-information fraction vs scale cut, per leg. Monopole
+($\ell=0$) curves saturate by $s\!\sim\!50\Mpch$ (small-scale information);
+quadrupole ($\ell=2$) curves rise slowly to large scales.}
+\label{fig:scale}
+\end{figure}
+
+\begin{figure}[h]\centering
+\includegraphics[width=0.49\textwidth]{param_response_rand_void.png}\hfill
+\includegraphics[width=0.49\textwidth]{param_response_rand_peak.png}
+\caption{Single-parameter response of the random void (left) and knot (right) legs
+from the Fisher $\pm$ pairs (shift $s^2\Delta\xi$ for $+$/$-$; rows are the four
+LCDM parameters). The $+$/$-$ mirror symmetry indicates a clean linear response;
+$\omega_{\rm cdm}$ dominates; void and knot differ.}
+\label{fig:resp}
+\end{figure}
+
+%======================================================================
+\section{Results III: monopole emulator and inference prototype}
+Guided by the floor result, we built the inference-ready piece: a \textbf{monopole}
+forward model and a SUNBIRD-style recovery test, both on the legs that are clean
+(the void \emph{data} monopoles are excluded --- near their $\xi$ zero-crossing the
+CV vanishes and RMS/CV diverges).
+
+\paragraph{Cross-cosmology accuracy (the gate).} The corrected monopole
+leave-one-cosmology-out (Fig.~\ref{fig:monoloco}) is a textbook interpolation-vs-
+extrapolation split: the nine Fisher cosmologies (dense LCDM neighbourhood) sit at
+\textbf{$\sim$1.1$\times$CV} (\code{c000} at 1.0$\times$, i.e.\ at cosmic variance),
+while the ten broad tier-3 cosmologies are extrapolation-limited at
+\textbf{$\sim$18$\times$CV}. So a monopole inference is genuinely inference-grade
+\emph{near LCDM today}; the broad prior needs the campaign's coverage.
+
+\paragraph{Inference recovery.} The likelihood uses the emulator $\mu(\theta)$, the
+subbox $C_{\rm CV}$, and an emulator-error $C_{\rm emu}$ from the Fisher-set LOCO
+residuals, with \code{emcee} over the four LCDM parameters (HOD fixed = prototype).
+Two mocks (Fig.~\ref{fig:corner}):
+\begin{itemize}
+\item \textbf{Synthetic} ($\mu$ at a displaced cosmology $+$ a draw from
+  $C_{\rm CV}\!+\!C_{\rm emu}$): $\chi^2/{\rm dof}=0.55$, all four parameters
+  recovered within $1\sigma$ at the displaced truth --- the
+  sampler/likelihood/emulator-gradient \textbf{machinery is validated}.
+\item \textbf{Real \code{c000}} ($C_{\rm tot}=C_{\rm CV}+C_{\rm emu}+C_{\rm label}$):
+  the calibration removes the gross bias of an earlier broken attempt
+  ($n_s$ from $-30\sigma$ to $-1.7\sigma$), but $\chi^2/{\rm dof}=13.5$ and
+  $\omega_b$ at $+3.2\sigma$ remain --- residual per-run emulator bias beyond the
+  averaged $C_{\rm emu}$, plus the fundamental same-phase-mock limitation (no
+  independent realisation is available under the no-new-HOD constraint).
+\end{itemize}
+
+\begin{figure}[h]\centering
+\includegraphics[width=0.66\textwidth]{monopole_loco.png}
+\caption{Monopole emulator leave-one-cosmology-out floor (corrected CV). Green =
+the nine Fisher LCDM-neighbourhood cosmologies ($\sim$1.1$\times$CV, interpolation);
+blue = the ten broad tier-3 cosmologies ($\sim$18$\times$CV, extrapolation). The gap
+is the cosmology-coverage gate.}
+\label{fig:monoloco}
+\end{figure}
+
+\begin{figure}[h]\centering
+\includegraphics[width=0.66\textwidth]{inference_monopole_corner.png}
+\caption{Recovery test (four LCDM parameters; dashed black $=$ \code{c000} truth).
+Red: synthetic mock --- recovers the displaced injection within $1\sigma$
+($\chi^2/{\rm dof}=0.55$), validating the pipeline. Blue: real \code{c000} mock with
+calibrated covariance --- much improved but not yet clean
+($\chi^2/{\rm dof}=13.5$), limited by per-run emulator realism.}
+\label{fig:corner}
+\end{figure}
+
+%======================================================================
+\section{Status and next steps}
+\textbf{Summary.} The emulator floor is understood and is not a wall: monopoles are
+inference-grade near LCDM ($\sim$1$\times$CV), the only true limiters are
+\emph{cosmology coverage} (extrapolation, $\to$ the campaign) and \emph{quadrupole
+iteration noise} ($\to$ a $\geq$10-iteration run). The SUNBIRD-style inference
+pipeline is built and its machinery validated on synthetic mocks; a clean real
+recovery is gated by emulator realism and the absence of independent-phase mocks.
+
+\textbf{Minimal coverage run (in progress).} Because coverage is the gate and HODs
+plateau by $\sim$30, the minimal step that fits the available allocation is
+\textbf{all 52 cosmologies $\times$ 20 maximin HODs $\times$ 3 iterations} (the 10
+pilot cosmologies reused), $\sim$840 new runs, $\sim$490 node-hours on the regular
+queue (\code{select\_tier3\_min.py}, \code{queue/launch\_tier3\_minimal.sh}). The
+payoff test: does the broad-prior monopole LOCO drop from $\sim$18$\times$ toward
+$\sim$1$\times$CV as the cosmology axis fills from 10 to 52?
+
+\textbf{Remaining levers.} (1) the full \code{c130}--\code{c181}$\times$100$\times$10
+campaign (free on the overrun queue) for coverage \emph{and} quadrupoles; (2) HOD
+marginalisation (currently fixed); (3) an external pre-populated mock suite for an
+honest covariance and genuinely independent recovery mocks.
 
 \end{document}
