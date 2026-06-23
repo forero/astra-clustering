@@ -65,15 +65,19 @@ def load(name):
 
 
 def select_targets(ds, stems):
-    """Boolean column mask + ordered list of (stem, ell, slice) blocks."""
+    """Boolean column mask + ordered list of (stem, ell, slice) blocks.
+
+    Blocks follow the COLUMN order of Y[:, mask] (the dataset build order that
+    np.isin preserves), NOT the requested `stems` order -- otherwise the slices
+    misalign with the data.  Each (stem, ell) is nb contiguous columns."""
     mask = np.isin(ds['stem'], stems)
     stem_sel, ell_sel = ds['stem'][mask], ds['ell'][mask]
-    blocks, i = [], 0
-    for st in stems:                                    # preserve requested order
-        for el in (0, 2):
-            n = int(((stem_sel == st) & (ell_sel == el)).sum())
-            if n:
-                blocks.append((st, el, slice(i, i + n))); i += n
+    nb = len(ds['s'])
+    ncols = int(mask.sum())
+    blocks = []
+    for k in range(ncols // nb):
+        sl = slice(k * nb, (k + 1) * nb)
+        blocks.append((str(stem_sel[k * nb]), int(ell_sel[k * nb]), sl))
     return mask, blocks
 
 

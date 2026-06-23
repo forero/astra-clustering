@@ -70,7 +70,12 @@ astra-clustering/
 │   ├── select_tier3_pilot.py     ← tier-3: maximin HODs for c130–c181 pilot
 │   ├── select_tier3_full.py      ← tier-3: maximin HODs for the full c130–c181 campaign (52 cosmo)
 │   ├── build_emulator_dataset.py ← cache tier3 + Fisher-anchor runs → data/emulator_tier3/*.npz
-│   └── emulator_tier3_mlp.py     ← tier-3 MLP emulator: LOCO + anchor, 8 diagnostics
+│   ├── emulator_tier3_mlp.py     ← tier-3 MLP emulator: LOCO + anchor, 8 diagnostics
+│   ├── emulator_tier3_learning_curve.py ← held-out error vs #training cosmologies
+│   ├── emulator_tier3_within_cosmo.py   ← within-cosmology HOD-interp floor (no cosmo extrapolation)
+│   ├── select_extra_hods.py      ← pick N more maximin HODs extending an existing selection
+│   ├── emulator_c000_hod_curve.py← c000 held-out error vs #training HODs (fixed test)
+│   └── scale_information.py       ← most-informative spatial scales (cosmology signal vs CV/HOD per s-bin)
 ├── queue/
 │   ├── run_single_box.sh         ← sbatch wrapper, single-box pipeline
 │   ├── run_subboxes.sh           ← sbatch wrapper, subbox pipeline
@@ -831,3 +836,38 @@ columns, never re-globs. `emulator_tier3_mlp.py` = torch MLP (noise-weighted MSE
   it's a personal cap); overrun is free/low-priority/preemptible and `--requeue` +
   per-task skip-logic make it safe. Resumable: re-run `launch_tier3_full.sh`.
   Expect days–weeks. When done: rebuild cache → `run_emulator_tier3.sh` → review.
+
+### Tier-3 diagnostics: campaign PAUSED pending floor investigation (2026-06-23)
+
+Before letting the campaign run, two pilot diagnostics + a scale study (all on
+existing data). **The campaign array `54892798` was CANCELLED** (user decision) — it
+never scheduled on overrun, so 0 new runs; `fullbox_tier3/` still has the 500 pilot.
+Resume with `launch_tier3_full.sh` once the floor below is understood.
+
+- **Leg-ordering bug fixed:** `select_targets` built blocks in PRIMARY_STEMS order
+  while `Y[:,mask]` is in build order → all 16 leg plots were mislabeled (headline
+  per-cosmology numbers were fine). Now follows column order.
+- **Learning curve vs #training cosmologies** (`emulator_tier3_learning_curve.py`):
+  FLAT at ~40–70× CV from N=2..9 (robust medians; low-N has extrapolation blowups).
+  But the 10 pilot cosmologies are spread every-5th, so this can't probe the DENSITY
+  the full campaign adds — weak proxy.
+- **Within-cosmology HOD-interp floor** (`emulator_tier3_within_cosmo.py`): 5-fold
+  within each cosmology (zero cosmology extrapolation) → **~8× CV** floor (priority
+  7–11×, very uniform across all 10). **Two floors:** (a) cosmology coverage IS a
+  lever — the 8→40-70× gap is the extrapolation penalty the campaign would close;
+  (b) a residual ~8× CV floor remains even with zero extrapolation (NOT
+  iteration-limited) → campaign as configured (15 bins, 100 HODs) likely asymptotes
+  ~8× CV ≈ 64× C_CV in variance = NOT inference-grade. Candidate causes: HOD-sample
+  (40-50 HODs in 12-D is thin — testing via c000 +50 HODs → `emulator_c000_hod_curve.py`),
+  coarse 15-bin data, or MLP architecture.
+- **Most-informative scales** (`scale_information.py`, all 19 cosmologies):
+  **monopole cosmology info is small-scale** (peaks ~26–55, ~50% by s≈30–55, matches
+  the vector-search finding); **quadrupole info is large-scale** (~105–145, Kaiser).
+  Small scales carry the highest cosmology S/N *and* the highest HOD nuisance (the two
+  coincide) — which is exactly why the emulator is needed there and where the ~8×
+  floor bites. Argues for **finer binning at s≲50–60 in the monopoles**. (First
+  cumulative metric Tr(C⁻¹Σ) was ill-conditioned → replaced with diagonal cumulative
+  Fisher; caveats: broad mixed prior, diagonal approx, 15 coarse bins.)
+- **c000 +50 HODs** (`select_extra_hods.py` → 100 total, array on regular qos): the
+  HOD-count test of whether the ~8× floor is HOD-sample-limited — run
+  `emulator_c000_hod_curve.py` once the 100 runs land.
