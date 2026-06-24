@@ -32,11 +32,15 @@ from emulator_tier3_learning_curve import cv_box_per_column
 REPO = Path(__file__).resolve().parents[1]
 
 
-def load_legs(ells):
-    """Stack tier3 + anchor; keep the requested multipole(s) of the 8 primary legs.
+LEGSETS = {'primary': emu.PRIMARY_STEMS,
+           'curated': ['tpcf_full_data', 'tpcf_cross_full_rand_q1']}  # the new strategy vector
+
+
+def load_legs(ells, stems):
+    """Stack tier3 + anchor; keep the requested multipole(s) of the given stems.
     Returns X, Y, Ynoise, cosmo, cv, s, and leg_blocks=[(stem,ell,slice),...]."""
     a = emu.load('dataset.npz'); b = emu.load('dataset_anchor.npz')
-    mask, blocks = emu.select_targets(a, emu.PRIMARY_STEMS)
+    mask, blocks = emu.select_targets(a, stems)
     sel_ell, sel_stem = a['ell'][mask], a['stem'][mask]
     keep = np.isin(sel_ell, ells)
     X = np.vstack([a['X'], b['X']])
@@ -55,12 +59,16 @@ def main():
     ap.add_argument('--ensemble', type=int, default=5)
     ap.add_argument('--epochs', type=int, default=2000)
     ap.add_argument('--ells', default='0', help='"0" (monopole) or "0,2" (mono+quad)')
+    ap.add_argument('--legs', default='primary', choices=list(LEGSETS),
+                    help='primary (8 env stems) or curated (full 2PCF + void-random-cross)')
     args = ap.parse_args()
     ells = [int(x) for x in args.ells.split(',')]
-    tag = 'monopole' if ells == [0] else 'monoquad'
-    print(f'device={emu.DEVICE}  ensemble={args.ensemble}  ells={ells}  tag={tag}')
+    base = 'monopole' if ells == [0] else 'monoquad'
+    tag = base if args.legs == 'primary' else f'{base}_{args.legs}'
+    print(f'device={emu.DEVICE}  ensemble={args.ensemble}  ells={ells}  legs={args.legs}  '
+          f'tag={tag}  (CV-weighted)')
 
-    X, Y, Yn, cosmo, cv, s, legs = load_legs(ells)
+    X, Y, Yn, cosmo, cv, s, legs = load_legs(ells, LEGSETS[args.legs])
     nb = len(s)
     print(f'{len(Y)} runs, {len(set(cosmo))} cosmologies; {tag} target {Y.shape[1]}-D '
           f'({len(legs)} stem×ell blocks x {nb} bins)')
@@ -70,7 +78,7 @@ def main():
     per_cos = {}
     for c in cosmos:
         te = cosmo == c
-        pm, ps, _ = emu.fit_ensemble(X[~te], Y[~te], Yn[~te], X[te],
+        pm, ps, _ = emu.fit_ensemble(X[~te], Y[~te], Yn[~te], X[te], cv=cv,
                                      n_ens=args.ensemble, epochs=args.epochs,
                                      seed0=hash(c) % 9999)
         Y_pred[te] = pm; Y_pred_std[te] = ps

@@ -147,19 +147,23 @@ def predict(model, X):
         return model(torch.tensor(X, dtype=torch.float32, device=DEVICE)).cpu().numpy()
 
 
-def fit_ensemble(Xtr_raw, Ytr, noise_tr, Xte_raw, n_ens, epochs, val_frac=0.15, seed0=0):
+def fit_ensemble(Xtr_raw, Ytr, noise_tr, Xte_raw, n_ens, epochs, val_frac=0.15, seed0=0, cv=None):
     """Standardise, split inner val, train n_ens MLPs; return (pred_mean, pred_std,
-    hists) for Xte in PHYSICAL units, plus the fitted standardisation."""
+    hists) for Xte in PHYSICAL units, plus the fitted standardisation.
+
+    Loss weighting: CV-weighted (1/CV^2, the inference metric) if `cv` (per-bin
+    cosmic-variance std) is given -- the adopted default for the strategy; else the
+    legacy iteration-noise weighting."""
     rng = np.random.default_rng(seed0)
     # input standardisation (train stats)
     xmu, xsd = Xtr_raw.mean(0), Xtr_raw.std(0) + 1e-12
     Xtr = (Xtr_raw - xmu) / xsd
     Xte = (Xte_raw - xmu) / xsd
-    # output standardisation (train stats) + noise weights
+    # output standardisation (train stats) + weights (CV or noise)
     ymu, ysd = Ytr.mean(0), Ytr.std(0) + 1e-12
     Ytr_z = (Ytr - ymu) / ysd
-    noise_bar = noise_tr.mean(0)
-    w = (ysd / (noise_bar + 1e-12)) ** 2
+    scale = cv if cv is not None else noise_tr.mean(0)
+    w = (ysd / (scale + 1e-12)) ** 2
     w = w / w.mean()                                    # mean-1 weights
     # inner validation split (by row, across the 9 training cosmologies)
     n = len(Xtr)
