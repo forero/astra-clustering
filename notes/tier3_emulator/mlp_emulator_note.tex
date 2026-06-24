@@ -442,14 +442,15 @@ neighbourhood-matched $C_{\rm emu}$ and the quadrupole are what tighten the test
 sharpen $w_0,w_a$.
 
 \begin{figure}[h]\centering
-\includegraphics[width=0.72\textwidth]{inference_c130_broad_corner.png}
-\caption{Broad-prior recovery of \code{c130} over six parameters. The two chains have
-\emph{different} truths: \textbf{black dashed} $=$ real \code{c130} truth (for the blue
-chain), \textbf{red dotted} $=$ the displaced synthetic injection (for the red chain).
-Red: synthetic mock --- recovers within $\sim1\sigma$ of \emph{its} truth at
-$\chi^2/{\rm dof}=0.34$, validating the machinery over the $w_0w_a$CDM$+$ subspace.
-Blue: real \code{c130} ($\chi^2/{\rm dof}=1.72$) --- $\omega_{\rm cdm},h$ recovered,
-$w_a$ loose (monopole-only cannot constrain the dark-energy EoS).}
+\includegraphics[width=0.49\textwidth]{inference_c130_broad_synth.png}\hfill
+\includegraphics[width=0.49\textwidth]{inference_c130_broad_real.png}
+\caption{Broad-prior recovery of \code{c130} over six parameters (68\%/95\% filled
+contours; dashed black $=$ truth). \emph{Left, synthetic mock} (red): recovers within
+$\sim1\sigma$ of its (displaced) injected truth at $\chi^2/{\rm dof}=0.34$ ---
+validates the machinery over the $w_0w_a$CDM$+$ subspace. \emph{Right, real \code{c130}}
+(blue, $\chi^2/{\rm dof}=1.72$): $\omega_{\rm cdm},h$ recovered; $\omega_b,n_s,w_0$
+biased $\sim$3$\sigma$ (residual per-run emulator bias); $w_a$ loose --- monopole-only
+cannot constrain the dark-energy EoS.}
 \label{fig:c130corner}
 \end{figure}
 

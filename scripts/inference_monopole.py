@@ -201,24 +201,24 @@ def main():
     try:
         from getdist import MCSamples, plots
         ndim = len(FIT)
-        ss = [MCSamples(samples=ch_s, names=[f'p{i}' for i in range(ndim)], labels=FIT_LABELS, label='synthetic'),
-              MCSamples(samples=ch_r, names=[f'p{i}' for i in range(ndim)], labels=FIT_LABELS, label=f'real {args.mock_cosmo}')]
-        g = plots.get_subplot_plotter()
-        g.triangle_plot(ss, filled=True,
-                        legend_labels=[f'synthetic (red truth)', f'real {args.mock_cosmo} (black truth)'])
-        # the two chains have DIFFERENT truths: mark both (black=real mock, red=synthetic injection)
-        for i in range(ndim):
-            for j in range(i + 1):
-                ax = g.subplots[i, j]
-                if ax is None:
-                    continue
-                ax.axvline(theta_true[FIT[j]], color='k', lw=1, ls='--')
-                ax.axvline(theta_inj[FIT[j]], color='r', lw=1, ls=':')
-                if i != j:
-                    ax.axhline(theta_true[FIT[i]], color='k', lw=1, ls='--')
-                    ax.axhline(theta_inj[FIT[i]], color='r', lw=1, ls=':')
-        out = REPO / f'plots/emulator_tier3/inference_{tag}_corner.png'
-        g.export(str(out)); print(f'Saved {out}  (black dashed = {args.mock_cosmo} truth, red dotted = synthetic)')
+        # the two chains have DIFFERENT truths -> two separate plots, smooth filled contours
+        def corner(chain, truth, color, suffix):
+            sm = MCSamples(samples=chain, names=[f'p{i}' for i in range(ndim)], labels=FIT_LABELS,
+                           settings={'smooth_scale_2D': 0.6, 'smooth_scale_1D': 0.5})
+            g = plots.get_subplot_plotter(); g.settings.num_plot_contours = 2
+            g.triangle_plot([sm], filled=True, contour_colors=[color], contour_lws=[1.4])
+            for i in range(ndim):
+                for j in range(i + 1):
+                    ax = g.subplots[i, j]
+                    if ax is None:
+                        continue
+                    ax.axvline(truth[FIT[j]], color='k', lw=1, ls='--')
+                    if i != j:
+                        ax.axhline(truth[FIT[i]], color='k', lw=1, ls='--')
+            out = REPO / f'plots/emulator_tier3/inference_{tag}_{suffix}.png'
+            g.export(str(out)); print(f'Saved {out}')
+        corner(ch_s, theta_inj, '#d62728', 'synth')      # synthetic: its own (displaced) truth
+        corner(ch_r, theta_true, '#1f77b4', 'real')      # real mock: the cosmology's truth
     except Exception as ex:
         print(f'corner plot skipped: {ex}')
 
