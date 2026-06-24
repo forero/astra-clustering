@@ -83,14 +83,16 @@ def main():
     nfull = len(FULL) * nb
     print(f'{len(Y)} runs; ASTRA vector {Y.shape[1]}-D (full {nfull} + quant {Y.shape[1]-nfull})')
 
-    # covariance: C_CV (full matrix) + diagonal C_emu from c000 5-fold residuals
+    # covariance: C_CV (full matrix) + diagonal C_emu from c000 5-fold residuals.
+    # The emulator is trained CV-WEIGHTED (cv = sqrt(diag C_CV)) -- the inference metric.
     C_CV, nsamp = subbox_cov(ASTRA, nb)
+    cv = np.sqrt(np.diag(C_CV))
     c0 = np.where(cosmo == 'c000')[0]
     rng = np.random.default_rng(0); perm = rng.permutation(len(c0)); resid = np.zeros((len(c0), Y.shape[1]))
     for f in range(5):
         te = c0[perm[f::5]]; tr = c0[np.setdiff1d(np.arange(len(c0)), perm[f::5])]
         pr = train_emulator(X, Y, Yn, exclude=list(np.setdiff1d(np.arange(len(X)), tr)),
-                            n_ens=1, epochs=args.epochs)
+                            n_ens=1, epochs=args.epochs, cv=cv)
         resid[perm[f::5]] = Y[te] - np.array([pr(X[i])[0] for i in te])
     C_emu = np.diag(resid.var(0))
     hartlap = (nsamp - Y.shape[1] - 2) / (nsamp - 1)
@@ -98,7 +100,7 @@ def main():
           f'C_emu/C_CV diag med={np.median(np.sqrt(np.diag(C_emu)/np.diag(C_CV))):.2f}')
 
     # one emulator on all data; one shared synthetic draw
-    predict = train_emulator(X, Y, Yn, exclude=[], n_ens=args.ensemble, epochs=args.epochs)
+    predict = train_emulator(X, Y, Yn, exclude=[], n_ens=args.ensemble, epochs=args.epochs, cv=cv)
     theta0 = X[c0[len(c0) // 2], :8].copy(); theta_hod = X[c0[len(c0) // 2], 8:].copy()
     lo, hi = X[:, :8].min(0), X[:, :8].max(0)
     theta_inj = theta0.copy()

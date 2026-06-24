@@ -74,14 +74,19 @@ def subbox_cov(stems, nb):
     return np.cov(X, rowvar=False) / 64.0, X.shape[0]
 
 
-def train_emulator(X, Y, Yn, exclude, n_ens, epochs):
-    """Train the monopole MLP ensemble; return predict(theta)->xi and standardisation."""
+def train_emulator(X, Y, Yn, exclude, n_ens, epochs, cv=None):
+    """Train the monopole MLP ensemble; return predict(theta)->xi and standardisation.
+
+    Loss weighting: CV-weighted (1/CV^2, the inference metric) if `cv` (per-bin cosmic-
+    variance std) is given -- this slashes the quantile-leg error ~15x vs the old
+    iteration-noise weighting (see emulator_arch_sweep.py); falls back to noise-weighted
+    if cv is None."""
     keep = np.ones(len(X), bool); keep[exclude] = False
     Xtr, Ytr, Ntr = X[keep], Y[keep], Yn[keep]
     xmu, xsd = Xtr.mean(0), Xtr.std(0) + 1e-12
     ymu, ysd = Ytr.mean(0), Ytr.std(0) + 1e-12
-    nb = np.mean(Ntr, 0)
-    w = (ysd / (nb + 1e-12)) ** 2; w = w / w.mean()
+    scale = cv if cv is not None else np.mean(Ntr, 0)     # CV-weighted (default) or noise
+    w = (ysd / (scale + 1e-12)) ** 2; w = w / w.mean()
     Xz = (Xtr - xmu) / xsd; Yz = (Ytr - ymu) / ysd
     rng = np.random.default_rng(0)
     va = rng.choice(len(Xz), max(1, len(Xz) // 7), replace=False)
@@ -146,7 +151,8 @@ def main():
           f'C_label/C_CV diag med={np.median(np.sqrt(np.diag(C_label)/np.diag(C_CV))):.2f}')
 
     # ---- emulator (exclude the real mock run from training) ----
-    predict = train_emulator(X, Y, Yn, exclude=[mock], n_ens=args.ensemble, epochs=args.epochs)
+    predict = train_emulator(X, Y, Yn, exclude=[mock], n_ens=args.ensemble, epochs=args.epochs,
+                             cv=np.sqrt(np.diag(C_CV)))   # CV-weighted loss
 
     lo = X[:, :8].min(0)[FIT]; hi = X[:, :8].max(0)[FIT]
 

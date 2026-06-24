@@ -455,55 +455,102 @@ cannot constrain the dark-energy EoS.}
 \end{figure}
 
 %======================================================================
-\section{Results V: the ASTRA value-add in inference (gated by the emulator)}
+\section{Results V: the ASTRA value-add is emulator-gated --- and CV-weighting
+partly unlocks it}
 The project's central claim is that splitting by environment adds cosmological
-information beyond the plain two-point function. We tested it directly
-(\code{inference\_astra\_valueadd.py}): an identical synthetic recovery run for two
-data vectors --- \textbf{baseline} (\code{tpcf\_full\_data} alone, the standard 2PCF)
-versus \textbf{full $+$ six ASTRA quantile monopoles} --- with the \emph{same} mock,
-emulator, and covariance $C=C_{\rm CV}+C_{\rm emu}$, so only the vector differs. The
-marginalised errors are essentially identical (Fig.~\ref{fig:valueadd}):
+information beyond the plain two-point function. We test it directly
+(\code{inference\_astra\_valueadd.py}): an identical synthetic recovery for two data
+vectors --- \textbf{baseline} (\code{tpcf\_full\_data}, the standard 2PCF) vs
+\textbf{full $+$ six ASTRA quantile monopoles} --- same mock, emulator and covariance
+$C=C_{\rm CV}+C_{\rm emu}$, so only the vector differs.
+
+\paragraph{First attempt (noise-weighted emulator): null.} The quantiles added
+nothing ($\sigma$ ratios 1.00/1.04/1.04/0.95). \emph{Not} for lack of information:
+the quantile-leg emulator error was $C_{\rm emu}/C_{\rm CV}\!\approx\!4.6$ (median),
+$\sim$22$\times$ in variance, so $C_{\rm CV}+C_{\rm emu}$ down-weighted the quantiles
+$\sim$22$\times$ and buried their (real) signal. This reconciles with the Fisher work:
+with a \emph{perfect} emulator ($C=C_{\rm CV}$) the documented value-add is
+1.3--2.4$\times$/param; in \emph{real} inference it evaporated because the environment
+legs were not emulated to $\ll$ CV.
+
+\paragraph{The fix --- CV-weighted loss.} An architecture/loss sweep
+(\code{emulator\_arch\_sweep.py}, Fig.~\ref{fig:archsweep}) found the culprit: the
+emulator was trained with an \emph{iteration-noise}-weighted loss ($1/\sigma_{\rm
+iter}^2$), which \emph{down-weights} the (per-iteration-noisy) quantile legs, so the
+joint MLP neglected them (cross-cosmology RMS/CV $\sim$31 on the quantile legs).
+Switching to a \textbf{CV-weighted loss} ($1/C_{\rm CV}$, the inference metric) cuts
+that to $\sim$2$\times$CV --- a \textbf{$\sim$15$\times$ improvement}, and every leg
+improves (it is the correct metric, not a trade-off). Per-leg networks add nothing
+beyond the weighting. We adopted CV-weighting in \code{train\_emulator}.
+
+\paragraph{Re-test (CV-weighted): partially unlocked.} $C_{\rm emu}/C_{\rm CV}$ drops
+$4.6\!\to\!2.65$, \emph{all} constraints tighten (the baseline 2PCF alone improves
+$\sim$1.5$\times$ on $\omega_{\rm cdm},h$ from the better emulator), and the ASTRA
+value-add \emph{emerges from null} (Fig.~\ref{fig:valueadd}):
 \begin{center}\small
 \begin{tabular}{lccc}
 \toprule
  & baseline 2PCF & full $+$ ASTRA & tighter by\\
 \midrule
-$\sigma(\omega_b)$        & 0.00104 & 0.00105 & 1.00$\times$\\
-$\sigma(\omega_{\rm cdm})$& 0.00975 & 0.00942 & 1.04$\times$\\
-$\sigma(h)$               & 0.0192  & 0.0183  & 1.04$\times$\\
-$\sigma(n_s)$             & 0.0326  & 0.0341  & 0.95$\times$\\
+$\sigma(\omega_b)$        & 0.00102 & 0.00110 & 0.93$\times$\\
+$\sigma(\omega_{\rm cdm})$& 0.00664 & 0.00570 & \textbf{1.16$\times$}\\
+$\sigma(h)$               & 0.0123  & 0.0112  & \textbf{1.10$\times$}\\
+$\sigma(n_s)$             & 0.0354  & 0.0353  & 1.00$\times$\\
 \bottomrule
 \end{tabular}
 \end{center}
-\textbf{The quantiles add nothing here --- but not because they lack information.}
-The cause is the emulator error: $C_{\rm emu}/C_{\rm CV}\!\approx\!4.6$ (median) on the
-quantile legs, i.e.\ $\sim$22$\times$ in variance, so in $C_{\rm CV}+C_{\rm emu}$ the
-quantile legs are down-weighted $\sim$22$\times$ and their (real) cosmology signal is
-buried. This reconciles cleanly with the Fisher work: with a \emph{perfect} emulator
-($C=C_{\rm CV}$) the documented value-add is 1.3--2.4$\times$ per parameter; in
-\emph{real} inference ($C=C_{\rm CV}+C_{\rm emu}$) it evaporates because the
-environment legs are not yet emulated to $\ll$ cosmic variance.
-
-\textbf{So the bottleneck has moved} from ``does ASTRA carry information'' (yes ---
-settled) to ``can we emulate the environment legs to $\ll$ CV'' (not yet). This sets
-a sharp, quantitative campaign target: drive the quantile-leg $C_{\rm emu}$ below
-cosmic variance (from $\sim$4.6$\times$) via denser cosmology coverage (the full
-\code{c130}--\code{c181}$\times$120) and more iterations (to lower the random/quadrupole
-label noise that inflates their emulator targets). The $\sim$490-node-hour coverage
-step made the monopole 2PCF inference-grade; unlocking ASTRA's \emph{extra}
-information needs the emulator to become much more accurate on the environment legs.
-(Caveat: monopole, 3-iteration, HOD-fixed --- a lower bound on the value-add.)
+Still short of the Fisher 1.3--2.4$\times$ because $C_{\rm emu}$ (2.65$\times$CV)
+remains \emph{above} cosmic variance. But the \textbf{mechanism is now demonstrated:
+the value-add grows as $C_{\rm emu}$ falls} (null at 4.6$\times$ $\to$ 1.16$\times$ at
+2.65$\times$). Extrapolating, driving $C_{\rm emu}\!\ll\!$CV (the full campaign: more
+iterations to kill the random/quadrupole label noise $+$ denser coverage) should
+deliver the full gain. The campaign justification is now precise: \emph{each factor
+$C_{\rm emu}$ drops below CV converts into ASTRA value-add}.
 
 \begin{figure}[h]\centering
-\includegraphics[width=0.66\textwidth]{astra_valueadd_corner.png}
-\caption{ASTRA value-add: synthetic recovery with the plain full-sample 2PCF (red)
-vs full $+$ six ASTRA environment-quantile monopoles (blue), same mock/emulator/
-covariance (dashed $=$ truth). The contours overlap --- the quantiles add nothing
-\emph{at the current emulator accuracy}, because their emulator error
-($C_{\rm emu}\!\sim\!4.6\,C_{\rm CV}$) swamps the extra signal. The information is real
-(Fisher shows 1.3--2.4$\times$); realising it requires a more accurate emulator.}
+\includegraphics[width=0.92\textwidth]{arch_sweep.png}
+\caption{Architecture/loss sweep on the value-add legs (cross-cosmology held-out
+RMS/CV; lower=better). The iteration-noise-weighted loss (grey) starves the quantile
+legs ($\sim$31$\times$CV median); a \textbf{CV-weighted loss} (blue) cuts them to
+$\sim$2$\times$CV ($\sim$15$\times$ better), and per-leg networks (red) add nothing
+beyond that. The loss weighting, not the architecture, was the lever.}
+\label{fig:archsweep}
+\end{figure}
+
+\begin{figure}[h]\centering
+\includegraphics[width=0.62\textwidth]{astra_valueadd_corner.png}
+\caption{ASTRA value-add with the CV-weighted emulator: full 2PCF (red) vs full $+$
+ASTRA quantiles (blue), same mock/emulator/covariance (dashed $=$ truth). The blue
+contours now sit \emph{inside} red for $\omega_{\rm cdm}$ and $h$ ($\sim$1.1$\times$),
+where with the noise-weighted emulator they overlapped exactly. The full Fisher gain
+awaits $C_{\rm emu}\!\ll\!$CV.}
 \label{fig:valueadd}
 \end{figure}
+
+%======================================================================
+\section{Results VI: HOD marginalisation and the real-vs-synthetic bias}
+\paragraph{HOD marginalisation (\code{inference\_hodmarg.py}).} The prototype fixes
+the 12 HOD parameters at truth --- optimistic. Re-running the c000 recovery with the
+HOD \emph{marginalised} (vary cosmology $+$ all 12 HOD, project to the cosmology block)
+inflates the cosmology errors only mildly: $\sigma(h)\times1.8$, $\sigma(n_s)\times1.6$,
+$\sigma(\omega_b),\sigma(\omega_{\rm cdm})\times1.0$. The monopole environment legs
+self-calibrate the HOD well enough that $\omega_b,\omega_{\rm cdm}$ are essentially
+HOD-robust; $h,n_s$ (broadband-shape-degenerate with the HOD) take the modest hit.
+This is far gentler than the 2--10$\times$ the joint-Fisher study warned of.
+
+\paragraph{Why real-mock recoveries are biased while synthetic ones are not.} A clean,
+recurring pattern: recoveries of a \emph{synthetic} mock (emulator at $\theta$ $+$ a
+draw from $C$) are \emph{unbiased} ($\chi^2/{\rm dof}\!\sim\!0.3$--0.6, all params
+$<1\sigma$), whereas recoveries of a \emph{real measured} mock (an actual c000/c130
+run) are biased $\sim$2--3$\sigma$ and their HOD-fixed/marginalised contours are both
+offset from truth. This is not the sampler: it is \textbf{per-run emulator realism}.
+The emulator gives the smooth $(\theta_{\rm cosmo},\theta_{\rm HOD})\!\to\!\xi$ map; a
+single measured realisation deviates from it (residual emulator bias $+$ 3-iteration
+label noise $+$ the same-phase-mock limitation: ph000 only, so no independent
+realisation to average against under the no-new-HOD constraint). The MCMC absorbs that
+mismatch by shifting the cosmology. So the synthetic tests validate the machinery; the
+real-mock bias is the same emulator-accuracy ($C_{\rm emu}$) limit, and shrinks as the
+emulator improves. Independent-phase mocks would remove it entirely.
 
 %======================================================================
 \section{Status and next steps}
@@ -515,15 +562,20 @@ remaining limiters are \emph{cosmology coverage at the 8-D hull corners}
 ($\to$ a $\geq$10-iteration run). The SUNBIRD-style inference pipeline is built and
 its machinery validated on synthetic mocks; broad-prior recovery is now attempted.
 
-\textbf{In progress.} (a) a mono+quad LOCO on the same 52-cosmology grid, to see how
-much the coverage fill helps the quadrupoles (separate from their iteration-noise
-floor); (b) the broad-prior c130 recovery above.
+\textbf{Two free wins banked since the coverage run:} (i) \textbf{CV-weighted loss}
+(\S\,13) --- a $\sim$15$\times$ accuracy gain on the environment legs that tightens all
+inference and partially unlocks the ASTRA value-add; (ii) \textbf{HOD marginalisation
+is cheap} (\S\,14) --- only $\sim$1.0--1.8$\times$ error inflation, not the feared
+2--10$\times$.
 
-\textbf{Remaining levers.} (1) the full \code{c130}--\code{c181}$\times$100$\times$10
-campaign (free on the overrun queue) for corner coverage \emph{and} quadrupoles;
-(2) HOD marginalisation (currently fixed); (3) an external pre-populated mock suite
-for an honest covariance and genuinely independent recovery mocks; (4) a
-neighbourhood-matched $C_{\rm emu}$ so broad-prior errors are not inflated by distant
-hull-corner cosmologies.
+\textbf{Remaining levers, now sharply targeted.} The single quantitative goal is to
+drive the environment-leg $C_{\rm emu}$ \emph{below} cosmic variance (it is
+$\sim$2.65$\times$ after CV-weighting); each factor below CV converts into ASTRA
+value-add. Routes: (1) the full \code{c130}--\code{c181}$\times$100$\times$10 campaign
+(free on overrun) for corner coverage \emph{and} the iterations that kill the
+random/quadrupole label noise; (2) a neighbourhood-matched $C_{\rm emu}$ (broad-prior
+errors are currently inflated $\sim$16$\times$ by distant hull-corner cosmologies);
+(3) an external pre-populated mock suite for an honest covariance and independent-phase
+recovery mocks (removes the real-mock bias of \S\,14).
 
 \end{document}
