@@ -205,17 +205,20 @@ def main():
               MCSamples(samples=ch_r, names=[f'p{i}' for i in range(ndim)], labels=FIT_LABELS, label=f'real {args.mock_cosmo}')]
         g = plots.get_subplot_plotter()
         g.triangle_plot(ss, filled=True,
-                        legend_labels=['synthetic (machinery)', f'real {args.mock_cosmo} (calibrated)'])
+                        legend_labels=[f'synthetic (red truth)', f'real {args.mock_cosmo} (black truth)'])
+        # the two chains have DIFFERENT truths: mark both (black=real mock, red=synthetic injection)
         for i in range(ndim):
             for j in range(i + 1):
                 ax = g.subplots[i, j]
                 if ax is None:
                     continue
-                ax.axvline(theta_true[FIT[j]], color='k', lw=0.8, ls='--')
+                ax.axvline(theta_true[FIT[j]], color='k', lw=1, ls='--')
+                ax.axvline(theta_inj[FIT[j]], color='r', lw=1, ls=':')
                 if i != j:
-                    ax.axhline(theta_true[FIT[i]], color='k', lw=0.8, ls='--')
+                    ax.axhline(theta_true[FIT[i]], color='k', lw=1, ls='--')
+                    ax.axhline(theta_inj[FIT[i]], color='r', lw=1, ls=':')
         out = REPO / f'plots/emulator_tier3/inference_{tag}_corner.png'
-        g.export(str(out)); print(f'Saved {out}  (dashed black = {args.mock_cosmo} truth)')
+        g.export(str(out)); print(f'Saved {out}  (black dashed = {args.mock_cosmo} truth, red dotted = synthetic)')
     except Exception as ex:
         print(f'corner plot skipped: {ex}')
 
