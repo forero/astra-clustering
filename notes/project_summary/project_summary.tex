@@ -1,0 +1,222 @@
+\documentclass[11pt]{article}
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{amsmath}\usepackage{amssymb}\usepackage{graphicx}
+\usepackage{booktabs}\usepackage{hyperref}
+\newcommand{\Mpch}{\,h^{-1}\,\mathrm{Mpc}}
+\newcommand{\code}[1]{\texttt{#1}}
+\newcommand{\Cemu}{C_{\rm emu}}
+\newcommand{\Ccv}{C_{\rm CV}}
+\title{ASTRA clustering --- project summary\\
+\large context, methods, and design recommendations for the Fisher and the emulator}
+\author{ASTRA clustering project}\date{June 2026}
+\begin{document}\maketitle
+
+\begin{abstract}
+A self-contained synthesis of the repository: the context, the underlying math, the
+ASTRA simulations, and --- the core of this note --- design recommendations (each backed
+by what we measured) for the \textbf{Fisher matrix} computation and the \textbf{full
+emulator}, followed by conclusions on what is most publishable and the recommended next
+steps. Companion technical notes carry the detail and figures:
+\code{notes/tier3\_emulator/mlp\_emulator\_note.pdf} (emulator $+$ inference) and
+\code{notes/fisher\_emulator/fisher\_emulator\_note.pdf} (emulator-based Fisher).
+\end{abstract}
+
+\section{Context}
+\textbf{ASTRA} classifies each galaxy by its local cosmic-web environment using a
+Delaunay tessellation over the combined data$+$random catalog, then measures the 2PCF
+\emph{per environment quantile}. The scientific bet: splitting clustering by environment
+(voids $\to$ knots) carries cosmological information \emph{beyond the plain 2PCF},
+because different environments respond differently to cosmology vs.\ to galaxy--halo
+(HOD) physics, breaking degeneracies. We pursue this on two tracks: a \textbf{Fisher
+forecast} (local derivatives $\to$ forecast errors) and an \textbf{emulator $+$
+inference} pipeline (a forward model $\xi(\theta)$ trained on simulations $\to$
+\emph{measured} constraints via MCMC). A hard constraint throughout: \textbf{no new HOD
+generation} --- we reuse existing HOD-populated boxes, single phase (\code{ph000}).
+
+\section{Basic math}
+\paragraph{Environment classification.} From the data/random neighbour counts in the
+tessellation,
+\[
+r=\frac{n_{\rm data}-n_{\rm rand}}{n_{\rm data}+n_{\rm rand}}\in[-1,1],
+\]
+binned into quantiles Q1 (void)$\dots$Q4 (knot). The 2PCF multipoles $\xi_\ell(s)$
+($\ell=0$ monopole, $\ell=2$ quadrupole) are measured for each \emph{leg}: full-sample
+auto, quantile autos, and full$\times$quantile crosses, for data and for randoms.
+
+\paragraph{Fisher matrix.}
+\[
+F_{ab}=\sum_{\rm bins}\frac{\partial\xi}{\partial\theta_a}\,C^{-1}\,
+\frac{\partial\xi}{\partial\theta_b},\qquad
+\sigma(\theta_a)=\sqrt{(F^{-1})_{aa}},\qquad
+\mathrm{FoM}=1/\sqrt{\det F^{-1}} .
+\]
+Its quality is set entirely by the \emph{derivatives} $\partial\xi/\partial\theta$ and
+the \emph{covariance} $C$.
+
+\paragraph{Emulator $+$ inference.} A neural emulator $\mu(\theta)=\xi(\theta_{\rm
+cosmo},\theta_{\rm HOD})$; Gaussian likelihood
+\[
+\chi^2(\theta)=\big(d-\mu(\theta)\big)^{\!\top} C_{\rm tot}^{-1}\big(d-\mu(\theta)\big),
+\qquad C_{\rm tot}=\Ccv+\Cemu\,(+\,C_{\rm label}),
+\]
+with $\Ccv$ the cosmic variance, $\Cemu$ the \emph{emulator-error} covariance, and
+$C_{\rm label}$ the measurement (ASTRA-iteration) noise of the data vector; MCMC over
+$\theta$ gives the posterior.
+
+\paragraph{Key diagnostics.}
+\begin{itemize}
+\item \textbf{RMS/CV} --- emulator prediction error in units of the cosmic-variance
+  $\sigma$; $<1$ is inference-grade.
+\item \textbf{value-add} $=\sigma(\text{2PCF})/\sigma(\text{2PCF}+\text{ASTRA})$ --- the
+  tightening from environment splits.
+\item $\Cemu/\Ccv$ --- emulator error relative to cosmic variance; sets whether a leg's
+  signal is usable in inference.
+\end{itemize}
+
+\section{The ASTRA simulations}
+\begin{itemize}
+\item \textbf{Boxes:} AbacusSummit, $2\Mpch$\,Gpc per side (native), HOD-populated at
+  $z=0.5$ with the yuan23 prior (\code{ntbfin} catalogs), \emph{single phase} \code{ph000};
+  $\sim$3--5\,M galaxies/box. Alcock--Paczynski rescaling to a common frame makes the
+  effective side vary per cosmology ($\sim$1.87--2.18\,Gpc/h, anisotropic); $\xi(s)$ is
+  measured in that AP frame.
+\item \textbf{RSD \& AP (how they enter the runs):} both are applied at load time, from
+  fields already in the catalogs. \emph{RSD} --- we take the line of sight along $z$ and
+  use the precomputed redshift-space coordinate \code{Z\_RSD} (which carries the
+  peculiar-velocity displacement $v_z/aH$) for the $z$-axis while \code{X\_PERP},
+  \code{Y\_PERP} stay real-space; this is what populates the quadrupole. \emph{AP} --- we
+  divide the transverse coordinates by the header factor \code{Q\_PERP} ($\propto$ the
+  $D_A$ ratio) and the line-of-sight by \code{Q\_PAR} ($\propto$ the $H$ ratio), mapping
+  each cosmology's box into the common fiducial frame; this anisotropic rescaling is
+  exactly why the effective box side differs per cosmology and is what makes $w_0,w_a$
+  observable through the quadrupole.
+\item \textbf{Cosmologies:} (i) a \emph{Fisher grid} --- \code{c000} (Planck $\Lambda$CDM)
+  $+$ neighbours varying the 4 $\Lambda$CDM params $(\omega_b,\omega_{\rm cdm},n_s,
+  \sigma_8)$ at $\pm2$--$3\%$; (ii) an \emph{emulator block} \code{c130}--\code{c181} ---
+  the AbacusSummit emulator Latin hypercube varying the broader $w_0w_a$CDM$+$ set: 8
+  params $(\omega_b,\omega_{\rm cdm},h,n_s,\alpha_s,N_{\rm ur},w_0,w_a)$; $A_s$ fixed,
+  $\sigma_8$ derived.
+\item \textbf{HODs:} 500 draws/cosmology exist; we use $\sim$20--100 (maximin-selected).
+\item \textbf{Pipeline:} full-box (periodic BC, the emulator target) and $500\Mpch$
+  sub-boxes (the covariance, pooled $\to\sim$576 samples); each run averages $N$ ASTRA
+  iterations (independent random realisations; $N=3$ in the pilot). Data product: 17
+  stems $\times$ 2 multipoles $\times$ 15 $s$-bins (0--150$\Mpch$) per run.
+\item \textbf{Status:} all 52 emulator cosmologies ($\times\sim$20--50 HODs) and 9 Fisher
+  cosmologies ($\times$50) are on disk (\code{c000} at 100); the coverage run filled the
+  cosmology axis 10$\to$52.
+\end{itemize}
+
+\section{Recommendations --- Fisher matrix design}
+\textbf{F1. Derivatives from the emulator at fixed HOD, not from the $\pm$ cosmology
+pairs.} \emph{Justification:} the $\pm2$--$3\%$ pairs are not HOD-matched, so HOD
+mismatch contaminated $\partial\xi/\partial\theta$ at the level of the cosmology signal
+--- the $\sigma_8$ derivative came out $\sim$11\% of the expected $2\xi$ and needed the
+Tier-0/1 noise-model$+$subtraction saga. The emulator gives $\partial\xi/\partial\theta$
+at \emph{fixed} HOD (HOD-clean by construction) over all \textbf{8} $w_0w_a$CDM$+$ params
+(the $\pm$ grid gave only the 4 $\Lambda$CDM).
+
+\textbf{F2. Use the realistic covariance $C=\Ccv+\Cemu$, not $\Ccv$ alone.}
+\emph{Justification:} with $\Ccv$ only (perfect emulator) the Fisher crowns the
+environment crosses, but the value-add test showed that in real inference the
+environment-leg $\Cemu$ ($\sim$3--7$\times$CV) down-weights exactly those legs and the
+value-add evaporated ($\times1.0$). A $\Ccv$-only Fisher is not predictive of achievable
+constraints.
+
+\textbf{F3. Marginalise the HOD jointly, with emulator gradients for both blocks.}
+\emph{Justification:} $\partial\xi/\partial\theta_{\rm HOD}$ from the same emulator gives
+a consistent $(8{+}12)$-param Fisher; the MCMC showed HOD-marginalisation inflates
+$\Lambda$CDM errors only $\times1.0$--$1.8$ ($\omega_b,\omega_{\rm cdm}$ HOD-robust;
+$h,n_s$ mild) --- far below the $2$--$10\times$ the old gradient$+$prior approach feared.
+
+\textbf{F4. Validate the Gaussian-linear Fisher against the MCMC; use DALI where it
+breaks.} \emph{Justification:} the curated-vector MCMC recovers \code{c000} unbiased and
+$\sim$Gaussian (Fisher reliable), but tier3$/w_0w_a$ recoveries are biased 2--4$\sigma$
+(non-Gaussian extrapolation) --- Fisher $\sigma$ must be cross-checked.
+
+\medskip\noindent\emph{Implementation:} \code{emufisher\_\{lib,build,forecast,campaign,
+validate\}.py}; note \code{notes/fisher\_emulator/}.
+
+\section{Recommendations --- emulator design}
+\textbf{E1. Train with a covariance-weighted loss ($1/\Ccv$), not iteration-noise
+weighting.} \emph{Justification:} the architecture sweep showed the iteration-noise loss
+\emph{starved} the environment legs (cross-cosmology RMS/CV $\sim$31); CV-weighting cut
+that to $\sim$2 --- a $\sim$\textbf{15$\times$} accuracy gain on exactly the legs that
+gate the value-add. Per-leg networks added nothing beyond the weighting.
+
+\textbf{E2. Curate the data vector; do not dump all legs.} \emph{Justification:} the
+greedy ranks the \textbf{void$\times$full-sample-cross monopole as the \#1 leg}, ahead of
+the plain 2PCF. The curated vector (full 2PCF $+$ void-random-cross monopole) gives a
+real value-add ($\sigma\times1.2$--$1.7$) and an unbiased \code{c000} recovery
+($<0.5\sigma$), whereas adding all six environment legs gave only $\times1.1$ (noisy
+legs dilute).
+
+\textbf{E3. Cosmology coverage is the dominant lever.} \emph{Justification:} filling the
+hull 10$\to$52 cosmologies dropped the broad-prior monopole LOCO from $\sim$18$\times$ to
+$\sim$3$\times$CV; the residual failures and the tier3$/w_0w_a$ recovery biases are 8-D
+\textbf{hull-corner extrapolation}, which only denser coverage fixes.
+
+\textbf{E4. ASTRA iterations are a \emph{minor} lever --- $N\approx10$ is plenty, not 25.}
+\emph{Justification:} a zero-compute test (propagating the stored per-iteration scatter
+as $\sigma_1/\sqrt{N}$) found the \textbf{quadrupole iteration noise already
+$\sim$0.2--0.4$\times$CV at $N=3$}, i.e.\ $\sim$10\% of the quad emulator error --- so
+more iterations barely move $\Cemu$. (The earlier ``quads need $\sim$25 iters'' used
+noise/\emph{spread}, not the inference-relevant noise/\emph{CV}.)
+
+\textbf{E5. HODs are saturated by $\sim$30/cosmology.} \emph{Justification:} the \code{c000}
+HOD learning curve plateaus by $K\!\approx\!30$ and is flat to $K=70$; the HOD response is
+low-dimensional and pooled across cosmologies, and HOD-marginalisation is already cheap.
+
+\textbf{E6. Campaign design: coverage-first, $\sim$10 iterations, $\sim$30--40 HODs} ---
+\emph{not} the original 120-HOD/high-iteration plan. \emph{Justification:} E3--E5; at
+fixed compute the budget is far better spent on the cosmology axis (corners) than on
+saturated HODs or already-adequate iterations.
+
+\textbf{E7. Monopoles are inference-grade now; quadrupoles ($\to w_0,w_a$) are
+coverage-limited.} \emph{Justification:} the full-2PCF $+$ data/random monopoles emulate
+at $\sim$1$\times$CV near LCDM and the $\Lambda$CDM recovery is clean today; $w_0/w_a$
+rely on the quadrupole, whose bias is set by coverage.
+
+\section{What is most publishable}
+\begin{enumerate}
+\item \textbf{The value-add is emulator-gated, not information-limited.} A general
+  methodological result: an environment/marked statistic can carry real cosmological
+  information (Fisher: 1.3--2.4$\times$/param) yet add \emph{nothing} in inference until
+  its emulator error falls below cosmic variance. This reframes ``does the statistic
+  help?'' as ``can we emulate it accurately enough?'', with a quantitative target
+  ($\Cemu\!\ll\!$CV).
+\item \textbf{A simple curated ASTRA vector beats the 2PCF today} --- full 2PCF $+$ the
+  single void$\times$full-cross monopole tightens $\Lambda$CDM by $\times1.2$--$1.7$ with
+  an unbiased recovery and essentially free HOD marginalisation.
+\item \textbf{The CV-weighted-loss fix} --- a $\sim$15$\times$ emulator-accuracy gain on
+  the environment legs from matching the training loss to the inference metric; broadly
+  useful for SBI emulators.
+\item \textbf{The lever analysis} --- coverage $\gg$ iterations $\approx$ HODs, each
+  backed by a targeted test (LOCO learning curve, quad-noise $1/\sqrt{N}$, HOD plateau)
+  --- budget guidance for any simulation-based-inference campaign.
+\item \textbf{An honest emulator-aware Fisher} --- $\Ccv\!\to\!\Ccv+\Cemu$ and HOD-clean
+  emulator derivatives, reconciling the optimistic Fisher with real MCMC.
+\end{enumerate}
+\noindent\textbf{Most publishable single paper:} an emulator-based ASTRA methodology
+paper combining (1), (2), (3), with the lever analysis (4) as the campaign justification.
+
+\section{Recommended next steps}
+\begin{enumerate}
+\item \textbf{Finish the emulator-based Fisher} (\code{emufisher\_*}, running): the
+  forecast $\sigma$ table over data vectors, the Fisher-vs-MCMC validation, and the
+  campaign FoM-vs-$\Cemu$ curve.
+\item \textbf{Run the corrected campaign:} all 52 \code{c130}--\code{c181} cosmologies,
+  \emph{densify the hull corners}, $\sim$10 iterations, $\sim$30--40 HODs --- driving the
+  environment-leg $\Cemu$ toward $\lesssim$0.1$\times$CV (the greedy shows this unlocks
+  $\sim$5$\times$ FoM and the full value-add).
+\item \textbf{A neighbourhood-matched $\Cemu$} so broad-prior errors are not inflated by
+  distant hull-corner cosmologies.
+\item \textbf{An external, independent-phase mock suite} (e.g.\ EZmocks) for an honest
+  covariance and unbiased real recoveries --- the main residual weakness under no-new-HOD.
+\item \textbf{Dark energy:} once coverage is dense, revisit $w_0/w_a$ with the quadrupole
+  and the higher-iteration runs --- the only directions still coverage-limited.
+\item \textbf{Production emulator:} an MLP (SUNBIRD-style) on the full campaign with the
+  curated vector $+$ CV-weighted loss; MCMC on held-out mocks; compare measured $\sigma$
+  to this Fisher.
+\end{enumerate}
+
+\end{document}
