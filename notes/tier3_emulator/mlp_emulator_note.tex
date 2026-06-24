@@ -553,6 +553,63 @@ real-mock bias is the same emulator-accuracy ($C_{\rm emu}$) limit, and shrinks 
 emulator improves. Independent-phase mocks would remove it entirely.
 
 %======================================================================
+\section{Results VII: emulator-aware greedy leg selection}
+The old Fisher greedy ranked legs with $C=C_{\rm CV}$ (a perfect emulator) and crowned
+the environment crosses. We redo it (\code{emulator\_greedy.py}) with the \emph{realistic}
+budget $C(\alpha)=C_{\rm CV}+\alpha\,C_{\rm emu}$ (emulator-derived derivatives;
+FoM$=\det(D_{\rm cosmo}^{\!\top}C^{-1}D_{\rm cosmo})^{1/2}$ over
+$\{\omega_b,\omega_{\rm cdm},h,n_s\}$), greedily forward-selecting among 18 candidate
+leg-blocks (full 2PCF $+$ the eight environment stems, $\ell=0$ and $\ell=2$), and sweep
+$\alpha$ from 1 (current emulator, $C_{\rm emu}/C_{\rm CV}\!\approx\!7.6$) to 0 (perfect).
+
+\paragraph{ASTRA's best leg beats the plain 2PCF --- even now.} At the current emulator
+accuracy ($\alpha=1$) the single most informative leg is the \textbf{void $\times$
+full-sample cross monopole} (\code{cross\_full\_rand\_q1}~$\ell0$), ahead of the plain
+2PCF; the top $\sim$4 legs are stable across all $\alpha$ (void-cross $\ell0$, full
+2PCF $\ell0{+}\ell2$, void-data $\ell0$). So a \emph{curated} ASTRA vector is the
+strong choice today --- and refines the earlier value-add null, which diluted the gain
+by adding all six legs indiscriminately (the noisy quadrupoles and q4-data legs do not
+help at current accuracy).
+
+\begin{center}\small
+\begin{tabular}{lcc}
+\toprule
+leg (greedy rank) & $\alpha=1$ (now) & $\alpha=0$ (perfect)\\
+\midrule
+void$\times$full cross $\ell0$ & 1 & 2\\
+full 2PCF $\ell0$              & 2 & 1\\
+full 2PCF $\ell2$              & 3 & 3\\
+void-data $\ell0$             & 4 & 5\\
+void$\times$full-data cross $\ell0$ & 9 & \textbf{4}\ (switches on)\\
+knot$\times$full-rand cross $\ell0$ & 13 & \textbf{9}\ (switches on)\\
+knot-data $\ell2$            & 6 & 14\ (noise-favoured now)\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\paragraph{The campaign payoff is in the tail --- and the bar is high.} The
+cumulative-FoM curves (Fig.~\ref{fig:greedy}) show a \emph{perfect} emulator reaching
+$\sim$500$\times$ the first-leg FoM at the full vector versus $\sim$90$\times$ now ---
+a \textbf{$\sim$5$\times$ FoM gap}, concentrated in the \emph{tail} legs (the extra
+environment crosses and quadrupoles that climb in rank as $\alpha\to0$). Crucially the
+$\alpha=1,0.3,0.1$ curves nearly overlap: reducing $C_{\rm emu}$ by $10\times$ barely
+helps, and only $C_{\rm emu}\!\to\!0$ unlocks the $5\times$. Since
+$C_{\rm emu}/C_{\rm CV}\!\approx\!7.6$ here, the campaign must drive the environment-leg
+$C_{\rm emu}$ \textbf{well below cosmic variance ($\sim$0.1$\times$CV), not merely to
+$\sim$CV} --- a sharper, more honest target than \S\,13 alone implied.
+
+\begin{figure}[h]\centering
+\includegraphics[width=0.66\textwidth]{emulator_greedy.png}
+\caption{Emulator-aware greedy: cumulative FoM vs.\ data vector, swept over the
+emulator-error scaling $\alpha$. A perfect emulator ($\alpha=0$, green) extracts
+$\sim$5$\times$ more total FoM from the full ASTRA vector than the current one
+($\alpha=1$, red); the $\alpha=1/0.3/0.1$ overlap shows the gain needs
+$C_{\rm emu}\!\ll\!$CV. The tail legs (environment crosses, quadrupoles) are where the
+campaign pays off.}
+\label{fig:greedy}
+\end{figure}
+
+%======================================================================
 \section{Status and next steps}
 \textbf{Summary.} The emulator floor is understood and is not a wall. Monopoles are
 inference-grade near LCDM ($\sim$1$\times$CV) and, after the coverage run, across most
@@ -568,10 +625,14 @@ inference and partially unlocks the ASTRA value-add; (ii) \textbf{HOD marginalis
 is cheap} (\S\,14) --- only $\sim$1.0--1.8$\times$ error inflation, not the feared
 2--10$\times$.
 
+\textbf{Curated vector now.} The emulator-aware greedy (\S\,15) says a strong vector
+\emph{today} is the void$\times$full cross monopole $+$ full 2PCF ($\ell0,\ell2$) $+$
+void-data monopole --- notably led by an ASTRA leg, not the plain 2PCF.
+
 \textbf{Remaining levers, now sharply targeted.} The single quantitative goal is to
-drive the environment-leg $C_{\rm emu}$ \emph{below} cosmic variance (it is
-$\sim$2.65$\times$ after CV-weighting); each factor below CV converts into ASTRA
-value-add. Routes: (1) the full \code{c130}--\code{c181}$\times$100$\times$10 campaign
+drive the environment-leg $C_{\rm emu}$ \emph{well below} cosmic variance --- the
+greedy shows $\sim$0.1$\times$CV (not merely $<$CV) is needed to unlock the full
+$\sim$5$\times$ FoM gain; each step down converts into ASTRA value-add. Routes: (1) the full \code{c130}--\code{c181}$\times$100$\times$10 campaign
 (free on overrun) for corner coverage \emph{and} the iterations that kill the
 random/quadrupole label noise; (2) a neighbourhood-matched $C_{\rm emu}$ (broad-prior
 errors are currently inflated $\sim$16$\times$ by distant hull-corner cosmologies);
