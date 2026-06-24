@@ -2,3 +2,14 @@ __pycache__/
 .ipynb_checkpoints/
 *.pyc
 logs/
+
+# LaTeX build artifacts (never commit)
+*.aux
+*.log
+*.out
+*.toc
+*.synctex.gz
+*.fls
+*.fdb_latexmk
+*.bbl
+*.blg

@@ -82,7 +82,12 @@ astra-clustering/
 │   ├── binning_proxy.py          ← coarsening-trend proxy: does finer binning help the floor?
 │   ├── emulator_data_vs_random.py← per-leg emulability (the floor is monopole-good vs quadrupole-bad)
 │   ├── emulator_monopole.py      ← monopole forward model + leave-one-cosmology-out validation
-│   └── inference_monopole.py     ← SUNBIRD-style recovery test (emulator + C_CV+C_emu + emcee)
+│   ├── inference_monopole.py     ← SUNBIRD-style recovery test (emulator + C_CV+C_emu + emcee)
+│   ├── emufisher_lib.py          ← emulator-Fisher shared: leg load, C_CV, derivs, joint HOD-marg Fisher, corner
+│   ├── emufisher_build.py        ← GPU build: CV-weighted emulator → D, C_CV, C_emu(LOCO) → emufisher_build.npz
+│   ├── emufisher_forecast.py     ← marginalised σ + FoM per data vector (2PCF/curated/full+ASTRA) + corner
+│   ├── emufisher_campaign.py     ← FoM vs C_emu scaling α (campaign payoff curve)
+│   └── emufisher_validate.py     ← emulator-Fisher σ vs the curated MCMC (validation)
 ├── queue/
 │   ├── run_single_box.sh         ← sbatch wrapper, single-box pipeline
 │   ├── run_subboxes.sh           ← sbatch wrapper, subbox pipeline
@@ -99,7 +104,8 @@ astra-clustering/
 │   └── launch_tier3_full.sh      ← full campaign: skip-aware manifest + throttled overrun array
 ├── data/             ← pipeline output; subdirs {cosmo}_hod{NNN}/, fullbox/, derivatives/
 ├── plots/            ← figure output; mirrors the data/ layout
-├── notes/            ← LaTeX technical notes (zero_crossing/, fisher/, vector_search/, tier3_emulator/)
+├── notes/            ← LaTeX technical notes (zero_crossing/, fisher/, vector_search/, tier3_emulator/,
+│                       fisher_emulator/, project_summary/); LaTeX .aux/.log/.out are gitignored
 ├── CLAUDE.md
 └── README.md
 ```
