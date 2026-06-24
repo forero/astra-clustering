@@ -455,6 +455,57 @@ cannot constrain the dark-energy EoS.}
 \end{figure}
 
 %======================================================================
+\section{Results V: the ASTRA value-add in inference (gated by the emulator)}
+The project's central claim is that splitting by environment adds cosmological
+information beyond the plain two-point function. We tested it directly
+(\code{inference\_astra\_valueadd.py}): an identical synthetic recovery run for two
+data vectors --- \textbf{baseline} (\code{tpcf\_full\_data} alone, the standard 2PCF)
+versus \textbf{full $+$ six ASTRA quantile monopoles} --- with the \emph{same} mock,
+emulator, and covariance $C=C_{\rm CV}+C_{\rm emu}$, so only the vector differs. The
+marginalised errors are essentially identical (Fig.~\ref{fig:valueadd}):
+\begin{center}\small
+\begin{tabular}{lccc}
+\toprule
+ & baseline 2PCF & full $+$ ASTRA & tighter by\\
+\midrule
+$\sigma(\omega_b)$        & 0.00104 & 0.00105 & 1.00$\times$\\
+$\sigma(\omega_{\rm cdm})$& 0.00975 & 0.00942 & 1.04$\times$\\
+$\sigma(h)$               & 0.0192  & 0.0183  & 1.04$\times$\\
+$\sigma(n_s)$             & 0.0326  & 0.0341  & 0.95$\times$\\
+\bottomrule
+\end{tabular}
+\end{center}
+\textbf{The quantiles add nothing here --- but not because they lack information.}
+The cause is the emulator error: $C_{\rm emu}/C_{\rm CV}\!\approx\!4.6$ (median) on the
+quantile legs, i.e.\ $\sim$22$\times$ in variance, so in $C_{\rm CV}+C_{\rm emu}$ the
+quantile legs are down-weighted $\sim$22$\times$ and their (real) cosmology signal is
+buried. This reconciles cleanly with the Fisher work: with a \emph{perfect} emulator
+($C=C_{\rm CV}$) the documented value-add is 1.3--2.4$\times$ per parameter; in
+\emph{real} inference ($C=C_{\rm CV}+C_{\rm emu}$) it evaporates because the
+environment legs are not yet emulated to $\ll$ cosmic variance.
+
+\textbf{So the bottleneck has moved} from ``does ASTRA carry information'' (yes ---
+settled) to ``can we emulate the environment legs to $\ll$ CV'' (not yet). This sets
+a sharp, quantitative campaign target: drive the quantile-leg $C_{\rm emu}$ below
+cosmic variance (from $\sim$4.6$\times$) via denser cosmology coverage (the full
+\code{c130}--\code{c181}$\times$120) and more iterations (to lower the random/quadrupole
+label noise that inflates their emulator targets). The $\sim$490-node-hour coverage
+step made the monopole 2PCF inference-grade; unlocking ASTRA's \emph{extra}
+information needs the emulator to become much more accurate on the environment legs.
+(Caveat: monopole, 3-iteration, HOD-fixed --- a lower bound on the value-add.)
+
+\begin{figure}[h]\centering
+\includegraphics[width=0.66\textwidth]{astra_valueadd_corner.png}
+\caption{ASTRA value-add: synthetic recovery with the plain full-sample 2PCF (red)
+vs full $+$ six ASTRA environment-quantile monopoles (blue), same mock/emulator/
+covariance (dashed $=$ truth). The contours overlap --- the quantiles add nothing
+\emph{at the current emulator accuracy}, because their emulator error
+($C_{\rm emu}\!\sim\!4.6\,C_{\rm CV}$) swamps the extra signal. The information is real
+(Fisher shows 1.3--2.4$\times$); realising it requires a more accurate emulator.}
+\label{fig:valueadd}
+\end{figure}
+
+%======================================================================
 \section{Status and next steps}
 \textbf{Summary.} The emulator floor is understood and is not a wall. Monopoles are
 inference-grade near LCDM ($\sim$1$\times$CV) and, after the coverage run, across most
