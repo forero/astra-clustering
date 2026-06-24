@@ -610,6 +610,73 @@ campaign pays off.}
 \end{figure}
 
 %======================================================================
+\section{Results VIII: the curated vector realises the ASTRA value-add now}
+Following the greedy, we built the curated vector \textbf{full 2PCF monopole $+$
+void-random-cross monopole} (\code{inference\_curated.py}) and re-ran all three
+inference tests. This is the strongest result of the note:
+\begin{itemize}
+\item \textbf{Value-add is now real:} adding the single best environment leg tightens
+  $\sigma$ by $\omega_b\!\times\!1.19$, $\omega_{\rm cdm}\!\times\!1.63$,
+  $h\!\times\!1.40$, $n_s\!\times\!1.72$ (Fig.~\ref{fig:curval}) --- versus $\times$1.1
+  for the indiscriminate six-leg add. \emph{Curate to the best few legs; do not dump
+  all of them.}
+\item \textbf{Real c000 recovery is unbiased} (all params $<0.5\sigma$) --- the
+  earlier $\sim$3$\sigma$ real-mock bias is gone, because both legs are well emulated.
+\item \textbf{HOD-marginalisation is essentially free} ($\times$0.9--1.1).
+\item \textbf{Why:} the leg diagnostic (\code{emulator\_leg\_diagnostic.py},
+  Fig.~\ref{fig:legdiag}) shows the void-random-cross monopole emulates at
+  \textbf{1.0$\times$CV in the LCDM neighbourhood} and 3.1$\times$ over the broad tier-3
+  prior --- inference-grade where it matters, with the failures confined to the 8-D
+  hull corners (e.g.\ \code{c160}).
+\end{itemize}
+
+\begin{figure}[h]\centering
+\includegraphics[width=0.49\textwidth]{inference_curated_valueadd.png}\hfill
+\includegraphics[width=0.49\textwidth]{leg_diagnostic_cross_full_rand_q1_l0.png}
+\caption{\emph{Left:} curated value-add (synthetic) --- full 2PCF (red) vs full $+$
+void-random-cross (blue); blue contours inside red ($\times$1.2--1.7). \emph{Right:}
+emulator quality on the void-random-cross monopole (CV-weighted LOCO): (a) error vs
+scale, (b) pred-vs-true ($c000$/$c130$ good, $c160$ edge fails), (c) pred-vs-true
+scatter, (d) per-cosmology floor (Fisher $\sim$1$\times$, tier-3 scattered).}
+\label{fig:curval}\label{fig:legdiag}
+\end{figure}
+
+%======================================================================
+\section{Results IX: dark energy (w0, wa), and iterations are NOT the lever}
+\paragraph{Recovering w0, wa.} Adding the full-2PCF quadrupole (the AP/RSD handle) we
+recover three held-out tier-3 cosmologies with non-trivial dark energy
+(\code{inference\_w0wa.py}; \code{c178},\code{c147},\code{c157}). $\chi^2/{\rm
+dof}\!\approx\!1$ (well calibrated) and \textbf{$w_a$ is recovered within
+$\sim$1.5$\sigma$} in all three; but $w_0$ and the LCDM params are biased 2--4$\sigma$.
+The bias is \emph{not} the sampler --- it is the per-run emulator error at these
+\emph{held-out tier-3 (extrapolation)} cosmologies ($\sim$2--4$\times$CV), exactly as
+the $c000$ \emph{interpolation} recovery was unbiased. So the dark-energy bias shrinks
+with \textbf{coverage}, not iterations.
+
+\paragraph{Iterations are not the quadrupole lever (a correction).} A zero-compute test
+(\code{quad\_noise\_vs\_iters.py}, Fig.~\ref{fig:quadnoise}) propagates the stored
+per-iteration scatter as $\sigma_1/\sqrt{N}$: the quadrupole ASTRA-iteration noise is
+\textbf{already only $\sim$0.2--0.4$\times$CV at $N=3$} (full-sample $\ell2$ $\sim$0,
+since it does not depend on the quantile split), falling to $\sim$0.1$\times$ only by
+$N=25$. Since the quadrupole \emph{emulator} error is $\sim$3$\times$CV, iteration noise
+is $\sim$10\% of it ($\sim$1\% in variance) --- \textbf{more iterations barely move the
+quadrupole $C_{\rm emu}$.} The earlier ``quads need $\sim$25 iterations'' used
+noise/\emph{spread} (vs the small HOD signal), a different quantity from the
+inference-relevant noise/CV. \emph{The quadrupole/dark-energy floor is coverage-limited,
+not iteration-limited.}
+
+\begin{figure}[h]\centering
+\includegraphics[width=0.49\textwidth]{inference_w0wa_c178.png}\hfill
+\includegraphics[width=0.49\textwidth]{quad_noise_vs_iters.png}
+\caption{\emph{Left:} six-parameter recovery of \code{c178} ($w_0{=}{-}0.87$,
+$w_a{=}{-}0.46$); $w_a$ recovered, $w_0$/LCDM biased (tier-3 extrapolation).
+\emph{Right:} quadrupole iteration-noise/CV vs $N$ --- already below 1 at $N=3$, so
+iterations are a minor lever; the per-iteration scatter from 3- vs 10-iteration
+$c000$ runs overlaps, confirming the $1/\sqrt{N}$ law.}
+\label{fig:quadnoise}
+\end{figure}
+
+%======================================================================
 \section{Status and next steps}
 \textbf{Summary.} The emulator floor is understood and is not a wall. Monopoles are
 inference-grade near LCDM ($\sim$1$\times$CV) and, after the coverage run, across most
@@ -632,7 +699,16 @@ void-data monopole --- notably led by an ASTRA leg, not the plain 2PCF.
 \textbf{Remaining levers, now sharply targeted.} The single quantitative goal is to
 drive the environment-leg $C_{\rm emu}$ \emph{well below} cosmic variance --- the
 greedy shows $\sim$0.1$\times$CV (not merely $<$CV) is needed to unlock the full
-$\sim$5$\times$ FoM gain; each step down converts into ASTRA value-add. Routes: (1) the full \code{c130}--\code{c181}$\times$100$\times$10 campaign
+$\sim$5$\times$ FoM gain; each step down converts into ASTRA value-add.
+
+\textbf{Campaign design, corrected (\S\,17).} The dominant lever is \emph{cosmology
+coverage} --- it sets the per-run extrapolation error that biases tier-3/dark-energy
+recoveries and inflates the environment-leg $C_{\rm emu}$. Iterations are a
+\emph{minor} lever (quadrupole iteration noise is already $\lesssim$0.4$\times$CV at
+$N=3$): $N\!\approx\!6$--10 is plenty, \emph{not} 25. HODs are saturated by $\sim$30.
+So spend the budget on \textbf{cosmologies first} (densify the c130--c181 hull,
+especially the corners), \textbf{$\sim$10 iterations}, and \textbf{$\sim$30--40 HODs} ---
+not the original 120-HOD/high-iteration plan. Routes: (1) the full \code{c130}--\code{c181}$\times$100$\times$10 campaign
 (free on overrun) for corner coverage \emph{and} the iterations that kill the
 random/quadrupole label noise; (2) a neighbourhood-matched $C_{\rm emu}$ (broad-prior
 errors are currently inflated $\sim$16$\times$ by distant hull-corner cosmologies);
