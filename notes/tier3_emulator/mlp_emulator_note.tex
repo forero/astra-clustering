@@ -337,25 +337,139 @@ calibrated covariance --- much improved but not yet clean
 \end{figure}
 
 %======================================================================
-\section{Status and next steps}
-\textbf{Summary.} The emulator floor is understood and is not a wall: monopoles are
-inference-grade near LCDM ($\sim$1$\times$CV), the only true limiters are
-\emph{cosmology coverage} (extrapolation, $\to$ the campaign) and \emph{quadrupole
-iteration noise} ($\to$ a $\geq$10-iteration run). The SUNBIRD-style inference
-pipeline is built and its machinery validated on synthetic mocks; a clean real
-recovery is gated by emulator realism and the absence of independent-phase mocks.
+\section{The expanded cosmology grid and its new parameters}
+A detail that drives everything below: the \emph{Fisher} grid (\code{c000} and
+\code{c100}--\code{c113}, the LCDM neighbourhood) varies only the \textbf{four}
+$\Lambda$CDM parameters $\{\omega_b,\omega_{\rm cdm},n_s,\sigma_8\}$ around Planck
+(with $h$, $A_s$ retuned), whereas the \emph{emulator block} \code{c130}--\code{c181}
+is the AbacusSummit emulator Latin hypercube, which opens up the broader
+$w_0w_a$CDM$+$ space. The eight parameters that vary across that block --- and hence
+the eight cosmology inputs of the emulator --- are:
+\begin{center}\small
+\begin{tabular}{llll}
+\toprule
+parameter & meaning & block range & in Fisher grid?\\
+\midrule
+$\omega_b$        & baryon density          & 0.0207--0.0243 & yes\\
+$\omega_{\rm cdm}$& cold dark matter density& 0.103--0.140   & yes\\
+$h$               & Hubble parameter        & 0.57--0.75     & (via retuning)\\
+$n_s$             & scalar spectral index   & 0.90--1.03     & yes\\
+$\alpha_s$        & running $dn_s/d\ln k$    & $-0.038$--$0.038$ & no (fixed 0)\\
+$N_{\rm ur}$      & ultra-relativistic species ($\sim N_{\rm eff}$) & 1.2--2.9 & no (fixed 2.03)\\
+$w_0$             & dark-energy EoS today   & $-1.27$--$-0.73$ & no (fixed $-1$)\\
+$w_a$             & EoS evolution           & $-0.63$--$0.62$  & no (fixed 0)\\
+\bottomrule
+\end{tabular}
+\end{center}
+$A_s$ is fixed across the block and $\sigma_8$ is a \emph{derived} quantity (a
+function of the eight inputs), so it is carried as a label, not an input. Three
+consequences shape the results:
+\begin{enumerate}
+\item \textbf{The cosmology space is genuinely 8-D.} Even 52 cosmologies give only
+  $52^{1/8}\!\approx\!1.7$ points per dimension --- dense in the interior, but the
+  \emph{corners} of the hull stay sparse, so edge cosmologies extrapolate.
+\item \textbf{Four of the eight ($\alpha_s,N_{\rm ur},w_0,w_a$) are new directions}
+  the Fisher work never touched; the emulator is the only way to model them.
+\item \textbf{Monopole-only data cannot constrain $w_0,w_a$ well.} The dark-energy
+  EoS enters mainly through the expansion history / Alcock--Paczynski distortion,
+  whose clean signature is anisotropic (the quadrupole); at fixed redshift the
+  real-space monopole is largely degenerate in $w_0$--$w_a$. So a monopole inference
+  pins $\omega_b,\omega_{\rm cdm},n_s$ but leaves $w_0,w_a$ loose until the
+  quadrupole comes online.
+\end{enumerate}
 
-\textbf{Minimal coverage run (in progress).} Because coverage is the gate and HODs
-plateau by $\sim$30, the minimal step that fits the available allocation is
-\textbf{all 52 cosmologies $\times$ 20 maximin HODs $\times$ 3 iterations} (the 10
-pilot cosmologies reused), $\sim$840 new runs, $\sim$490 node-hours on the regular
-queue (\code{select\_tier3\_min.py}, \code{queue/launch\_tier3\_minimal.sh}). The
-payoff test: does the broad-prior monopole LOCO drop from $\sim$18$\times$ toward
-$\sim$1$\times$CV as the cosmology axis fills from 10 to 52?
+%======================================================================
+\section{Results IV: the coverage run pays off}
+The minimal coverage run --- \textbf{all 52 cosmologies $\times$ 20 maximin HODs
+$\times$ 3 iterations} (the 10 pilot cosmologies reused; $\sim$840 new runs,
+$\sim$490 node-hours), via \code{select\_tier3\_min.py} and
+\code{queue/launch\_tier3\_minimal.sh} --- completed (it cleared in $\sim$12 h once
+an overnight backfill window opened, far faster than the fairshare rate implied).
+Re-running the monopole leave-one-cosmology-out over the now-filled grid
+(Fig.~\ref{fig:monoloco52}) confirms the central hypothesis:
+\begin{center}\small
+\begin{tabular}{lcc}
+\toprule
+monopole LOCO (per-cosmology median RMS/CV) & 10 cosmologies & \textbf{52 cosmologies}\\
+\midrule
+tier-3 broad prior & $\sim$18$\times$ & \textbf{3.3$\times$}\\
+Fisher LCDM neighbourhood & 1.1$\times$ & 0.9$\times$ (unchanged)\\
+\bottomrule
+\end{tabular}
+\end{center}
+Densening the hull $10\!\to\!52$ pulls the broad-prior emulator from extrapolation
+($\sim$18$\times$) down by $\sim$5.5$\times$ toward the interpolation floor: now
+\textbf{44\% of tier-3 cosmologies are below 3$\times$CV and 65\% below 5$\times$},
+and the 10 original pilot cosmologies went from $\sim$18$\times$ to 3.8$\times$
+(e.g.\ \code{c130} 1.1$\times$, \code{c140} 1.2$\times$). \textbf{Coverage was the
+gate.} The residual outliers (\code{c160} 87$\times$, \code{c180} 24$\times$) are the
+8-D hull \emph{corners} of \S\,8 --- where 52 points are still too sparse. (Note the
+per-cosmology \emph{median}, 3.3$\times$, is the representative number; an RMS pooled
+over all runs is dominated by those few outliers and reads higher.)
+
+\begin{figure}[h]\centering
+\includegraphics[width=0.78\textwidth]{monopole_loco.png}
+\caption{Monopole emulator LOCO over the filled grid (52 tier-3 + 9 Fisher
+cosmologies, corrected CV). Green = Fisher LCDM neighbourhood ($\sim$0.9$\times$CV,
+interpolation); blue = tier-3 broad prior (median 3.3$\times$, was $\sim$18$\times$
+at 10 cosmologies). A few 8-D hull corners (e.g.\ \code{c160}) remain
+extrapolation-limited.}
+\label{fig:monoloco52}
+\end{figure}
+
+\paragraph{Broad-prior inference (prototype).} With the broad directions now
+modelled, \code{inference\_monopole.py} was generalised (\code{--mock-cosmo},
+\code{--fit lcdm|broad}) and a tier-3 cosmology (\code{c130}) recovered over the six
+monopole-relevant parameters $\{\omega_b,\omega_{\rm cdm},h,n_s,w_0,w_a\}$
+(Fig.~\ref{fig:c130corner}). This was simply \emph{impossible} before the coverage
+run --- the broad directions had no gradient support. Results:
+\begin{itemize}
+\item \textbf{Synthetic mock} (inject a displaced point, recover): $\chi^2/{\rm
+  dof}=0.34$ and \emph{all six} parameters --- \emph{including} $w_0,w_a$ ---
+  recovered within $\sim1\sigma$. The broad-prior sampler/likelihood/emulator-gradient
+  machinery is validated over the full $w_0w_a$CDM$+$ subspace.
+\item \textbf{Real \code{c130} mock}: $\chi^2/{\rm dof}=1.72$ --- far better-calibrated
+  than the LCDM-only $c000$ test ($13.5$), because the honest (large) tier-3
+  $C_{\rm emu}$ gives a realistic error budget. $\omega_{\rm cdm}$ and $h$ recover
+  well ($+0.1\sigma$, $-0.4\sigma$); $\omega_b,n_s,w_0$ are biased at $\sim$3$\sigma$
+  (residual per-run emulator bias); and $w_a$ is loose ($\pm0.22$), exactly as
+  expected --- the monopole alone cannot pin the dark-energy EoS.
+\end{itemize}
+Two caveats remain: for a tier-3 mock $C_{\rm emu}/C_{\rm CV}\!\sim\!16$ (inflated by
+the hull-corner outliers), so broad-prior inference is currently emulator-error-,
+not cosmic-variance-limited; and the same-phase-mock limitation persists. A
+neighbourhood-matched $C_{\rm emu}$ and the quadrupole are what tighten the test and
+sharpen $w_0,w_a$.
+
+\begin{figure}[h]\centering
+\includegraphics[width=0.72\textwidth]{inference_c130_broad_corner.png}
+\caption{Broad-prior recovery of \code{c130} over six parameters (dashed black $=$
+truth). Red: synthetic mock --- recovers within $1\sigma$ at $\chi^2/{\rm dof}=0.34$,
+validating the machinery over the $w_0w_a$CDM$+$ subspace. Blue: real \code{c130}
+($\chi^2/{\rm dof}=1.72$) --- $\omega_{\rm cdm},h$ recovered, $w_a$ loose
+(monopole-only cannot constrain the dark-energy EoS).}
+\label{fig:c130corner}
+\end{figure}
+
+%======================================================================
+\section{Status and next steps}
+\textbf{Summary.} The emulator floor is understood and is not a wall. Monopoles are
+inference-grade near LCDM ($\sim$1$\times$CV) and, after the coverage run, across most
+of the broad prior (tier-3 median 3.3$\times$CV, from $\sim$18$\times$). The only
+remaining limiters are \emph{cosmology coverage at the 8-D hull corners}
+($\to$ the denser full campaign) and \emph{quadrupole iteration noise}
+($\to$ a $\geq$10-iteration run). The SUNBIRD-style inference pipeline is built and
+its machinery validated on synthetic mocks; broad-prior recovery is now attempted.
+
+\textbf{In progress.} (a) a mono+quad LOCO on the same 52-cosmology grid, to see how
+much the coverage fill helps the quadrupoles (separate from their iteration-noise
+floor); (b) the broad-prior c130 recovery above.
 
 \textbf{Remaining levers.} (1) the full \code{c130}--\code{c181}$\times$100$\times$10
-campaign (free on the overrun queue) for coverage \emph{and} quadrupoles; (2) HOD
-marginalisation (currently fixed); (3) an external pre-populated mock suite for an
-honest covariance and genuinely independent recovery mocks.
+campaign (free on the overrun queue) for corner coverage \emph{and} quadrupoles;
+(2) HOD marginalisation (currently fixed); (3) an external pre-populated mock suite
+for an honest covariance and genuinely independent recovery mocks; (4) a
+neighbourhood-matched $C_{\rm emu}$ so broad-prior errors are not inflated by distant
+hull-corner cosmologies.
 
 \end{document}

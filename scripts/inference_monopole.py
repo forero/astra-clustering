@@ -42,8 +42,12 @@ LEGS = ['tpcf_data_q4', 'tpcf_cross_full_data_q4',
         'tpcf_rand_q1', 'tpcf_rand_q4',
         'tpcf_cross_full_rand_q1', 'tpcf_cross_full_rand_q4']     # clean monopole legs
 COSMO_NAMES = ['omega_b', 'omega_cdm', 'h', 'n_s', 'alpha_s', 'N_ur', 'w0_fld', 'wa_fld']
-FIT = [0, 1, 2, 3]                                                # infer the 4 LCDM params
-FIT_LABELS = [r'\omega_b', r'\omega_{cdm}', 'h', 'n_s']
+ALL_LABELS = [r'\omega_b', r'\omega_{cdm}', 'h', 'n_s', r'\alpha_s', r'N_{ur}', 'w_0', 'w_a']
+# fit-parameter sets: 'lcdm' = 4 LCDM; 'broad' = the params monopole can hope to
+# constrain (skip alpha_s, N_ur which need more); set at runtime.
+FITSETS = {'lcdm': [0, 1, 2, 3], 'broad': [0, 1, 2, 3, 6, 7]}
+FIT = FITSETS['lcdm']                                             # overridden in main()
+FIT_LABELS = [ALL_LABELS[i] for i in FIT]
 
 
 def load_monopole(name):
@@ -97,12 +101,16 @@ def train_emulator(X, Y, Yn, exclude, n_ens, epochs):
 
 
 def main():
+    global FIT, FIT_LABELS
     ap = argparse.ArgumentParser()
     ap.add_argument('--steps', type=int, default=4000)
     ap.add_argument('--ensemble', type=int, default=3)
     ap.add_argument('--epochs', type=int, default=2000)
+    ap.add_argument('--mock-cosmo', default='c000', help='cosmology to recover (e.g. c130)')
+    ap.add_argument('--fit', default='lcdm', choices=list(FITSETS), help='parameter set')
     args = ap.parse_args()
-    print(f'device={emu.DEVICE}')
+    FIT = FITSETS[args.fit]; FIT_LABELS = [ALL_LABELS[i] for i in FIT]
+    print(f'device={emu.DEVICE}  mock={args.mock_cosmo}  fit={args.fit} {FIT}')
 
     # ---- data ----
     Xa, Ya, Na, ca, stems, ells, cols, s = load_monopole('dataset.npz')
@@ -111,24 +119,25 @@ def main():
     cosmo = np.concatenate([ca, cb])
     nb = len(s); print(f'{len(Y)} runs; monopole vector {Y.shape[1]}-D ({len(LEGS)} legs x {nb})')
 
-    # ---- mock: a held-out c000 run ----
-    c000 = np.where(cosmo == 'c000')[0]
-    mock = int(c000[len(c000) // 2])
+    # ---- mock: a held-out run of the requested cosmology ----
+    msel = np.where(cosmo == args.mock_cosmo)[0]
+    mock = int(msel[len(msel) // 2])
     d = Y[mock].copy()
     theta_true = X[mock, :8].copy()
     theta_hod = X[mock, 8:].copy()
-    print(f'mock = c000 run #{mock}; truth (LCDM): '
+    print(f'mock = {args.mock_cosmo} run #{mock}; truth: '
           + ', '.join(f'{COSMO_NAMES[i]}={theta_true[i]:.4g}' for i in FIT))
 
     # ---- covariances ----
     C_CV, nsamp = subbox_cov(stems, nb)
     lc = np.load(REPO / 'data/emulator_tier3/monopole_loco.npz', allow_pickle=True)
-    # C_emu from the Fisher-set (LCDM-neighbourhood) LOCO residuals for these legs
     lc_stems = lc['stems'].astype(str); lc_cos = lc['cosmo'].astype(str)
     leg_cols = np.concatenate([np.where(lc_stems == st)[0] * nb + np.arange(nb)
                                for st in LEGS if st in lc_stems])
-    fisher = np.array([int(c[1:]) < 130 for c in lc_cos])
-    C_emu = np.cov(lc['resid'][np.ix_(fisher, leg_cols)], rowvar=False)
+    # C_emu: LCDM-neighbourhood residuals for an LCDM mock, else all-cosmology residuals
+    grp = (np.array([int(c[1:]) < 130 for c in lc_cos]) if args.mock_cosmo[0] == 'c'
+           and int(args.mock_cosmo[1:]) < 130 else np.ones(len(lc_cos), bool))
+    C_emu = np.cov(lc['resid'][np.ix_(grp, leg_cols)], rowvar=False)
     # mock measurement (label) noise: the c000 run is a 3-iteration mean
     C_label = np.diag((Yn[mock] ** 2) / 3.0)
     hartlap = (nsamp - len(C_CV) - 2) / (nsamp - 1)
@@ -168,18 +177,23 @@ def main():
 
     # (A) SYNTHETIC mock: emulator at a displaced cosmology + a draw from C_CV+C_emu.
     #     Recovers by construction -> validates the sampler/likelihood machinery.
+    lo8 = X[:, :8].min(0); hi8 = X[:, :8].max(0)         # full 8-param ranges (do not clobber lo/hi)
     theta_inj = theta_true.copy()
-    theta_inj[1] *= 1.05; theta_inj[3] *= 0.98          # displace omega_cdm +5%, n_s -2%
+    for k in FIT:                                        # displace each fitted param ~30% toward an edge
+        theta_inj[k] = theta_true[k] + 0.3 * (hi8[k] - theta_true[k] if theta_true[k] < (lo8[k]+hi8[k])/2
+                                              else lo8[k] - theta_true[k])
     C_synth = C_CV + C_emu
     rng = np.random.default_rng(1)
     d_synth = predict(np.concatenate([theta_inj, theta_hod]))[0] \
         + rng.multivariate_normal(np.zeros(len(C_synth)), C_synth)
     ch_s, mean_s, std_s = recover(d_synth, C_synth, theta_inj, 'SYNTHETIC (machinery)')
 
-    # (B) REAL c000 mock with label-noise-calibrated covariance.
-    ch_r, mean_r, std_r = recover(d, C_CV + C_emu + C_label, theta_true, 'REAL c000 (calibrated)')
+    # (B) REAL mock with label-noise-calibrated covariance.
+    ch_r, mean_r, std_r = recover(d, C_CV + C_emu + C_label, theta_true,
+                                  f'REAL {args.mock_cosmo} (calibrated)')
 
-    np.savez(REPO / 'data/emulator_tier3/inference_monopole.npz',
+    tag = f'{args.mock_cosmo}_{args.fit}'
+    np.savez(REPO / f'data/emulator_tier3/inference_{tag}.npz',
              chain_synth=ch_s, truth_synth=theta_inj[FIT],
              chain_real=ch_r, truth_real=theta_true[FIT],
              names=np.array([COSMO_NAMES[k] for k in FIT]))
@@ -188,9 +202,10 @@ def main():
         from getdist import MCSamples, plots
         ndim = len(FIT)
         ss = [MCSamples(samples=ch_s, names=[f'p{i}' for i in range(ndim)], labels=FIT_LABELS, label='synthetic'),
-              MCSamples(samples=ch_r, names=[f'p{i}' for i in range(ndim)], labels=FIT_LABELS, label='real c000')]
+              MCSamples(samples=ch_r, names=[f'p{i}' for i in range(ndim)], labels=FIT_LABELS, label=f'real {args.mock_cosmo}')]
         g = plots.get_subplot_plotter()
-        g.triangle_plot(ss, filled=True, legend_labels=['synthetic (machinery)', 'real c000 (calibrated)'])
+        g.triangle_plot(ss, filled=True,
+                        legend_labels=['synthetic (machinery)', f'real {args.mock_cosmo} (calibrated)'])
         for i in range(ndim):
             for j in range(i + 1):
                 ax = g.subplots[i, j]
@@ -199,8 +214,8 @@ def main():
                 ax.axvline(theta_true[FIT[j]], color='k', lw=0.8, ls='--')
                 if i != j:
                     ax.axhline(theta_true[FIT[i]], color='k', lw=0.8, ls='--')
-        out = REPO / 'plots/emulator_tier3/inference_monopole_corner.png'
-        g.export(str(out)); print(f'Saved {out}  (dashed black = c000 truth)')
+        out = REPO / f'plots/emulator_tier3/inference_{tag}_corner.png'
+        g.export(str(out)); print(f'Saved {out}  (dashed black = {args.mock_cosmo} truth)')
     except Exception as ex:
         print(f'corner plot skipped: {ex}')
 
