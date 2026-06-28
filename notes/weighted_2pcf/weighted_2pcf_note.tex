@@ -1,0 +1,226 @@
+\documentclass[11pt]{article}
+
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{hyperref}
+\usepackage{xcolor}
+
+\graphicspath{{../../plots/fullbox_weighted/}}
+
+\newcommand{\Mpch}{\,h^{-1}\,\mathrm{Mpc}}
+\newcommand{\code}[1]{\texttt{#1}}
+\newcommand{\rpar}{r}
+\newcommand{\xifull}{\xi}
+
+\title{Technical note: ASTRA weighted correlation functions ---
+replacing environment \emph{splits} with a continuous \emph{weight}}
+\author{ASTRA clustering project}
+\date{June 2026}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+The ASTRA analysis classifies each object by a local cosmic-web parameter
+$\rpar=(n_{\rm data}-n_{\rm rand})/(n_{\rm data}+n_{\rm rand})\in[-1,1]$ obtained
+from a Delaunay tessellation over the joint data$+$random catalog, then splits the
+sample into quantiles of $\rpar$ and measures a two-point correlation function
+(2PCF) per quantile.  Here we develop an alternative that uses $\rpar$ directly as
+a per-object \emph{weight} and measures \emph{weighted} (marked) correlation
+functions, avoiding the information loss and bin-edge discontinuities of the
+split.  We are careful to keep three populations distinct: the \emph{data}
+galaxies (which carry redshift-space distortions), the \emph{ASTRA randoms} (the
+$1\times$ uniform points that enter the Delaunay and therefore carry an $\rpar$),
+and the \emph{geometry randoms} (the $5\times$ uniform catalog that is only the
+Landy--Szalay reference).  Crucially, only the two $\rpar$-carrying populations are
+weighted; the geometry randoms define the window and are never weighted.  We
+present the estimator (a unified weighted Landy--Szalay with mean-normalised
+weights, so the uniform weight reproduces the standard 2PCF exactly), seven weight
+schemes, three statistics (data auto, ASTRA-random auto, and their cross), and the
+first full-box measurement on the fiducial \code{c000}/\code{hod484} box.  This
+note documents the method in full; the results section is populated as the first
+run completes.
+\end{abstract}
+
+\section{Motivation}
+The quantile split has two practical drawbacks.  First, it discards information:
+the continuous $\rpar$ is reduced to a four-level label, and the bin edges are
+arbitrary.  Second, it is not smooth: the bin boundaries introduce discontinuities
+that are awkward for the emulator/Fisher derivatives that the rest of the project
+relies on, and they enlarge the data vector (four quantiles $\times$ several leg
+families), inflating the Hartlap penalty.  A continuous weight $w=f(\rpar)$ keeps
+the full $\rpar$ information, is differentiable in the cosmological and HOD
+parameters, and produces a compact data vector.  Weighted (``marked'')
+correlation functions are an established tool in large-scale structure with known
+sensitivity to modified gravity, massive neutrinos, and assembly bias
+\cite{Sheth2005,White2016,Massara2021}, which strengthens the science case.
+
+\section{Three populations, and which ones are weighted}
+The pipeline keeps three populations strictly separate; conflating them is the
+main pitfall.
+\begin{itemize}
+  \item \textbf{Data} ($N_{\rm d}$ galaxies): carry redshift-space distortions
+        (the line-of-sight coordinate is \code{Z\_RSD}); each has an $\rpar$.
+  \item \textbf{ASTRA randoms} ($1\times$ data; regenerated each iteration with
+        seed \code{SEED}$+$\code{iter}): the uniform points that enter the
+        Delaunay tessellation, so each carries an $\rpar$.  These are the
+        ``random quantile'' tracers of the split analysis.
+  \item \textbf{Geometry randoms} ($5\times$ data; fixed seed): a uniform catalog
+        used \emph{only} as the Landy--Szalay reference (the survey window).  They
+        do \emph{not} enter the Delaunay and therefore have no $\rpar$.
+\end{itemize}
+Because the geometry randoms have no $\rpar$, they cannot and must not be weighted
+by $f(\rpar)$: weighting the LS reference by a data-derived quantity would distort
+the window rather than the signal.  The weights attach only to the data and the
+ASTRA randoms; the geometry randoms remain uniform and unweighted.  This is the
+continuous analog of the split analysis, in which the data and the ASTRA randoms
+are each binned, while the geometry randoms provide the common reference for every
+2PCF.
+
+\section{Estimator}
+\subsection{The environment parameter}
+For each object in the joint catalog, the Delaunay neighbour counts give
+\begin{equation}
+  \rpar=\frac{n_{\rm data}-n_{\rm rand}}{n_{\rm data}+n_{\rm rand}}\in[-1,1],
+\end{equation}
+with $\rpar\to-1$ in voids and $\rpar\to+1$ in knots.  Objects with no neighbours
+($n_{\rm data}+n_{\rm rand}=0$, exceedingly rare) have $\rpar$ undefined and are
+dropped uniformly across all schemes, so every scheme uses the same sample.
+
+\subsection{Weighted Landy--Szalay with mean-normalised weights}
+Given a per-object mark $m_i=f(\rpar_i)$ for a tracer population, we form
+mean-normalised weights
+\begin{equation}
+  w_i=\frac{f(\rpar_i)}{\langle f(\rpar)\rangle},
+  \qquad \langle w\rangle = 1,
+  \label{eq:norm}
+\end{equation}
+computed separately per population and per ASTRA iteration.  The weighted 2PCF is
+the standard Landy--Szalay estimator with these weights on the tracer(s) and unit
+weights on the geometry randoms $G$:
+\begin{equation}
+  \hat\xi_w(s,\mu)=\frac{D_wD_w-2\,D_wG+GG}{GG}
+  \label{eq:wLS}
+\end{equation}
+for an auto-correlation, and the analogous cross form
+$\hat\xi_w=(D_wA_w-D_wG-A_wG+GG)/GG$ for the data$\times$ASTRA-random cross, where
+$A_w$ denotes the weighted ASTRA randoms.  Pair counts are normalised by the sums
+of weights, which \code{pycorr} handles natively.  The geometry-random pair count
+$GG$ is computed once and reused by every estimator.  The multipoles
+$\xi_{w,\ell}(s)$ for $\ell=0,2$ follow by the usual Legendre projection.
+
+The mean normalisation~(\ref{eq:norm}) has a useful consequence: the
+\emph{uniform} scheme $f\equiv1$ gives $w_i\equiv1$ and~(\ref{eq:wLS}) reduces to
+the ordinary 2PCF.  We use this as a built-in unit test (the uniform weighted
+curve must coincide with the standard full-data $\xifull$).
+
+\subsection{Marked correlation for signed marks}
+For the signed mark $m=\rpar$ (which changes sign between voids and knots), the
+mean-normalised weighted estimator measures the marked-correlation
+\emph{numerator} $W(s)$.  The marked correlation function itself is the ratio
+\begin{equation}
+  M(s)=\frac{1+W(s)}{1+\xifull(s)},
+  \label{eq:MCF}
+\end{equation}
+with $\xifull$ the unmarked (uniform) correlation; $M(s)=1$ is the null of no
+mark--clustering correlation, $M>1$ that high-$\rpar$ objects cluster more
+strongly at scale $s$.  We report $M_0(s)$ formed per iteration from the saved
+$W_0$ (signed) and $\xi_0$ (uniform) arrays.
+
+\section{Weight schemes}
+We measure the following $f(\rpar)$ (Table~\ref{tab:weights}).  All but the signed
+mark are non-negative, so their weighted $\xi_{w,\ell}$ are clean Landy--Szalay
+objects; the signed mark is reported through the marked-correlation
+ratio~(\ref{eq:MCF}).
+\begin{table}[h]
+  \centering
+  \begin{tabular}{lll}
+    \toprule
+    Scheme & $f(\rpar)$ & character \\
+    \midrule
+    uniform & $1$ & baseline; reproduces the standard 2PCF (unit test) \\
+    knot    & $(1+\rpar)/2$ & overdense emphasis (continuous Q4) \\
+    void    & $(1-\rpar)/2$ & underdense emphasis (continuous Q1) \\
+    rank    & $\mathrm{rank}(\rpar)/N$ & distribution-robust continuous quantile \\
+    power   & $[(1+\rpar)/2]^2$ & sharpened knot emphasis \\
+    exp     & $\exp(2\rpar)$ & smooth, tunable, positive \\
+    signed  & $\rpar$ & signed density weighting; marked correlation $M_0$ \\
+    \bottomrule
+  \end{tabular}
+  \caption{Weight schemes. The rank is computed within each population
+  (data, ASTRA randoms) separately, per iteration.}
+  \label{tab:weights}
+\end{table}
+
+\section{Statistics}
+For each scheme we measure the weighted multipoles $\ell=0,2$ of three statistics:
+\begin{itemize}
+  \item \textbf{data auto}: data weighted by $f(\rpar_{\rm data})$;
+  \item \textbf{ASTRA-random auto}: ASTRA randoms weighted by $f(\rpar_{\rm A})$;
+  \item \textbf{data $\times$ ASTRA-random cross}: the two weighted fields of the
+        \emph{same} iteration, cross-correlated.
+\end{itemize}
+The cross quadrupole is expected to be the most informative of the three: the data
+carry RSD while the ASTRA randoms do not, so the cross $\ell=2$ probes the data's
+velocity anisotropy modulated by the environment weighting, whereas the
+ASTRA-random auto $\ell=2$ is expected to be weak (those points have no peculiar
+velocity).
+
+\section{Implementation}
+\code{scripts/pipeline\_fullbox\_weighted.py} runs the full $2\Mpch\,$Gpc box.  Per
+ASTRA iteration it (i)~generates the ASTRA randoms, (ii)~builds the joint catalog
+and runs \code{astra.classify\_fast} to obtain $\rpar$ for every object,
+(iii)~aligns $\rpar$ to the data and ASTRA-random position arrays and \emph{stores}
+them (\code{fbw\_rvalues\_iter\{it\}.npz}, \code{float32}) so the weighting can be
+recomputed or extended without re-running the (expensive) Delaunay, and
+(iv)~computes the weighted multipoles of the three statistics for all seven
+schemes.  Outputs go to \code{data/fullbox\_weighted/\{cosmo\}\_hod\{NNN\}/} with
+prefix \code{fbw\_}.  \code{scripts/plot\_fullbox\_weighted.py} produces the figures;
+\code{queue/run\_fullbox\_weighted.sh} is the CPU-node wrapper.  The
+\code{pycorr} weighted API and the uniform-equals-unweighted identity were
+validated in a smoke test before the first run.
+
+\section{First test}
+\begin{itemize}
+  \item Catalog: \code{c000}/\code{hod484} (the Fisher/emulator fiducial), full box.
+  \item ASTRA iterations: $3$; display as iteration mean$\,\pm\,$std.
+  \item Binning: $s\in[0,150]\Mpch$, 15 bins; $\mu$ in 240 bins; $\ell=0,2$.
+  \item Schemes: all seven of Table~\ref{tab:weights}.
+\end{itemize}
+
+\section{Results}
+\emph{(To be populated when the first run \code{55159247} completes.)}  The planned
+figures are
+\begin{itemize}
+  \item \code{weighted\_xi\_multipoles.png}: $s^2\xi_{w,\ell}(s)$ for the positive
+        schemes, $3\times2$ (data / ASTRA-random / cross $\times$ $\ell=0,2$);
+  \item \code{marked\_correlation\_signed.png}: $M_0(s)$ for the signed mark, per
+        statistic.
+\end{itemize}
+Key checks to record: (i)~the uniform curve coincides with the standard full-data
+$\xifull$; (ii)~the void and knot schemes bracket the uniform curve as the
+underdense/overdense-emphasised correlations; (iii)~the cross quadrupole carries
+RSD signal while the ASTRA-random auto quadrupole is weak; (iv)~$M_0(s)$ departs
+from unity where the environment correlates with clustering.
+
+\section{Outlook}
+Once validated, the weighted vectors can be dropped into the existing
+Fisher/emulability machinery for a like-for-like comparison against the quantile
+legs: do the continuous weights carry the same (or more) cosmological information
+at a lower data-vector dimension, and are they more emulable (smoother in the
+parameters)?  Natural extensions are tunable exponents (the \code{power}/\code{exp}
+knobs), cross-weightings (void-weighted $\times$ knot-weighted, the continuous
+analog of the void/knot cross legs that were the Fisher workhorses), and the
+standardised zero-mean mark (the mark variance / density-fluctuation weighting).
+
+\begin{thebibliography}{9}
+\bibitem{Sheth2005} R.~K.~Sheth, ``Marked correlations,'' MNRAS \textbf{364} (2005) 796.
+\bibitem{White2016} M.~White, ``Marked correlations and optimal weights,'' JCAP \textbf{11} (2016) 057.
+\bibitem{Massara2021} E.~Massara et al., ``Using the marked power spectrum to detect the signature of neutrinos,'' PRL \textbf{126} (2021) 011301.
+\end{thebibliography}
+
+\end{document}
