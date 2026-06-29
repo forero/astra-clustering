@@ -87,7 +87,11 @@ astra-clustering/
 │   ├── emufisher_build.py        ← GPU build: CV-weighted emulator → D, C_CV, C_emu(LOCO) → emufisher_build.npz
 │   ├── emufisher_forecast.py     ← marginalised σ + FoM per data vector (2PCF/curated/full+ASTRA) + corner
 │   ├── emufisher_campaign.py     ← FoM vs C_emu scaling α (campaign payoff curve)
-│   └── emufisher_validate.py     ← emulator-Fisher σ vs the curated MCMC (validation)
+│   ├── emufisher_validate.py     ← emulator-Fisher σ vs the curated MCMC (validation)
+│   ├── pipeline_fullbox_weighted.py ← weighted-2PCF: r-as-weight (marked) xi per scheme → data/fullbox_weighted/
+│   ├── plot_fullbox_weighted.py  ← weighted-2PCF first-test figures (multipoles + marked M0)
+│   ├── weighted_subbox_cov.py    ← weighted-2PCF CV covariance by REANALYSIS of cached fiducial run
+│   └── fisher_weighted_compare.py← weighted-2PCF schemes vs quantile full-auto, HOD-fixed Fisher σ
 ├── queue/
 │   ├── run_single_box.sh         ← sbatch wrapper, single-box pipeline
 │   ├── run_subboxes.sh           ← sbatch wrapper, subbox pipeline
@@ -101,7 +105,10 @@ astra-clustering/
 │   ├── launch_tier3_pilot.sh     ← tier-3 pilot: c130–c181 × 50 HODs → data/fullbox_tier3/
 │   ├── run_emulator_tier3.sh     ← GPU sbatch wrapper for emulator_tier3_mlp.py
 │   ├── run_fullbox_array.sh      ← job-array runner (manifest-driven full-box pipeline)
-│   └── launch_tier3_full.sh      ← full campaign: skip-aware manifest + throttled overrun array
+│   ├── launch_tier3_full.sh      ← full campaign: skip-aware manifest + throttled overrun array
+│   ├── run_fullbox_weighted.sh   ← weighted-2PCF full-box wrapper (<cosmo> <hod>)
+│   ├── launch_fisher_fullbox_weighted.sh ← submit the 8 ± weighted runs (skip-aware)
+│   └── run_weighted_cov.sh       ← weighted-2PCF reanalysis-covariance wrapper
 ├── data/             ← pipeline output; subdirs {cosmo}_hod{NNN}/, fullbox/, derivatives/
 ├── plots/            ← figure output; mirrors the data/ layout
 ├── notes/            ← LaTeX technical notes (zero_crossing/, fisher/, vector_search/, tier3_emulator/,
@@ -955,3 +962,42 @@ over the 4 LCDM params {ω_b,ω_c,h,n_s}, HOD fixed (prototype). 6 clean monopol
 mocks (unavailable). Next levers unchanged: (1) full c130–c181 campaign at ≥10 iters for
 coverage + quadrupoles; (2) HOD marginalisation (currently fixed); (3) external EZmock-type
 covariance for an honest C and independent mocks.
+
+### Weighted-2PCF strand: continuous r-weight instead of quantile splits (2026-06-27→29)
+
+New direction, distinct from the quantile/emulator work above. Note:
+`notes/weighted_2pcf/weighted_2pcf_note.{tex,pdf}`. Idea: instead of binning the ASTRA
+environment parameter r=(n_data−n_rand)/(n_data+n_rand) into quantiles and correlating
+each, use **r itself as a per-object weight** → weighted/marked correlation functions
+(White 2016, Massara+ 2021). Three populations stay STRICTLY separate: **data** (RSD, has
+r) and **astra_randoms** (1× uniform, enter Delaunay, have r) are the two r-carrying
+populations that get weighted; **geometry randoms** (5×) are the unweighted Landy–Szalay
+window and are NEVER weighted (they have no r). Statistics per ASTRA iteration: weighted
+ℓ=0,2 of data-auto, astra_random-auto, and data×astra_random cross. Unified weighted-LS
+with **mean-normalised weights** w_i=f(r_i)/⟨f(r)⟩ → 'uniform' reproduces standard ξ
+exactly (built-in unit test). Schemes: uniform, knot (1+r)/2, void (1−r)/2, rank/CDF,
+power, exp, signed r (the marked numerator). `pipeline_fullbox_weighted.py` caches r per
+object per iteration so weighting can be redone without re-running the Delaunay.
+
+- **First test done + written up (2026-06-29):** c000/hod484, full box, 3 iters. All four
+  checks pass — uniform == standard ξ (and its arand/cross collapse to ~0); void suppresses
+  / knot/power/exp amplify monotonically on mono AND quad; cross quad nonzero and grows with
+  overdense weighting; signed mark W₀=+0.21, W₂=−0.82 (cross flips sign). No artefacts. The
+  continuous mark responds to environment like the splits with no binning loss.
+- **Minimal multi-cosmology Fisher campaign launched (2026-06-29):** head-to-head
+  weighted-vs-quantile on the EXISTING 9-cosmology matched-HOD Fisher grid (same cosmo/HODs),
+  HOD-FIXED → a RELATIVE comparison (matched single-HOD pairs carry the same HOD
+  contamination as the pre-Tier-1 quantile Fisher; σ optimistic, σ₈ worst). Only new compute
+  = the **8 ± weighted runs** (`launch_fisher_fullbox_weighted.sh`, ~5 node-hr). Covariance =
+  **reanalysis** of the cached c000 run (`weighted_subbox_cov.py`: tile box into 64 subboxes
+  × 3 iters, weighted LS ξ per subbox/scheme, C/64 to full-box volume; NO new sims — caveat:
+  global-r restricted to subboxes slightly under-states cov vs a faithful local-Delaunay
+  subbox pipeline, deferred). `fisher_weighted_compare.py` then builds weighted
+  central-difference derivatives per scheme + HOD-fixed Fisher and prints marginalised
+  σ{ω_b,ω_c,n_s,lnσ₈} per scheme vs the quantile full-auto baseline with gain ratios + a bar
+  figure.
+- **NEXT:** when the 8 runs + covariance land (~half day), run `fisher_weighted_compare.py`
+  and read which scheme/parameter the weighting beats the quantile legs on. If promising, the
+  non-minimal follow-up is the HOD-CLEAN version — weighted ξ on the 50-draw HOD ensemble per
+  cosmology (~400 runs, global-response derivatives) — and an emulability test of the
+  weighted vectors vs the quantile legs.
