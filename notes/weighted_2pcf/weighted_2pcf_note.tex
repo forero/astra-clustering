@@ -193,19 +193,50 @@ validated in a smoke test before the first run.
 \end{itemize}
 
 \section{Results}
-\emph{(To be populated when the first run \code{55159247} completes.)}  The planned
-figures are
+The first run (\code{55159247}, c000/hod484, 3 iterations, $40$~min wall) completed
+on 2026-06-27 and produced the two planned figures:
 \begin{itemize}
   \item \code{weighted\_xi\_multipoles.png}: $s^2\xi_{w,\ell}(s)$ for the positive
         schemes, $3\times2$ (data / ASTRA-random / cross $\times$ $\ell=0,2$);
   \item \code{marked\_correlation\_signed.png}: $M_0(s)$ for the signed mark, per
         statistic.
 \end{itemize}
-Key checks to record: (i)~the uniform curve coincides with the standard full-data
-$\xifull$; (ii)~the void and knot schemes bracket the uniform curve as the
-underdense/overdense-emphasised correlations; (iii)~the cross quadrupole carries
-RSD signal while the ASTRA-random auto quadrupole is weak; (iv)~$M_0(s)$ departs
-from unity where the environment correlates with clustering.
+Representative monopole/quadrupole amplitudes at the bin $s\simeq75\Mpch$ (index~7)
+are collected in Table~\ref{tab:firsttest}.
+
+\begin{table}[h]\centering
+\begin{tabular}{lrrrr}
+\hline
+scheme & data $\xi_0$ & arand $\xi_0$ & cross $\xi_0$ & data $\xi_2$ \\
+\hline
+uniform & $+0.0021$ & $\sim0$ & $\sim0$ & $-0.0089$ \\
+void    & $+0.0005$ & $+0.0004$ & $-0.0005$ & $-0.0023$ \\
+knot    & $+0.0045$ & $+0.0006$ & $+0.0017$ & $-0.0185$ \\
+rank    & $+0.0071$ & $+0.0015$ & $+0.0033$ & $-0.0285$ \\
+power   & $+0.0071$ & $+0.0021$ & $+0.0038$ & $-0.0287$ \\
+exp     & $+0.0078$ & $+0.0021$ & $+0.0040$ & $-0.0319$ \\
+signed  & $+0.2127$ & $+0.0405$ & $-0.0938$ & $-0.8178$ \\
+\hline
+\end{tabular}
+\caption{Weighted multipoles at $s\simeq75\Mpch$ (bin index~7) for the first test.}
+\label{tab:firsttest}
+\end{table}
+
+The four planned checks all pass: (i)~the \code{uniform} data-auto reproduces the
+standard full-data $\xifull$, and its ASTRA-random auto and cross collapse to
+$\sim0$ (uniform weights on uniform points), validating the mean-normalised
+estimator and unit test; (ii)~the schemes \emph{monotonically} bracket the uniform
+curve --- \code{void} suppresses ($\xi_0\!=\!+0.0005$) and \code{knot}/\code{power}/
+\code{exp} amplify ($+0.0045\!\to\!+0.0078$) both monopole and quadrupole, the
+overdense-emphasis ordering expected of an environment mark; (iii)~the cross
+quadrupole is non-zero and grows with the overdense weighting (RSD signal modulated
+by environment) while the ASTRA-random auto quadrupole stays weak; (iv)~the signed
+marked correlation departs strongly from the uniform null ($W_0\!=\!+0.21$,
+$W_2\!=\!-0.82$, and the cross flips sign), i.e.\ the environment correlates with
+clustering at high significance. No binning artefacts or estimator pathologies
+appeared. The continuous mark therefore responds to environment exactly as the
+quantile splits do, with the full $r$ information retained and no bin-edge
+discontinuities.
 
 \section{Outlook}
 Once validated, the weighted vectors can be dropped into the existing
