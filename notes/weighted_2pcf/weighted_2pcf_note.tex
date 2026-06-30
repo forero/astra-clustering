@@ -238,15 +238,75 @@ appeared. The continuous mark therefore responds to environment exactly as the
 quantile splits do, with the full $r$ information retained and no bin-edge
 discontinuities.
 
+\section{Minimal multi-cosmology Fisher comparison}
+The first test fixes the estimator; the question that matters is whether the
+continuous mark carries \emph{cosmological} information competitive with the
+quantile legs.  We answer it on the existing nine-cosmology matched-HOD Fisher
+grid (the same $\pm$ pairs that drive the quantile Fisher: $c100/179,c101/152$ for
+$\omega_b$; $c102/556,c103/861$ for $\omega_c$; $c104/498,c105/589$ for $n_s$;
+$c112/507,c113/483$ for $\sigma_8$; $c000/484$ fiducial).  The only new compute is
+the eight $\pm$ weighted runs; the covariance is built by \emph{reanalysis} of the
+cached $c000$ box (\code{weighted\_subbox\_cov.py}: tile into $64$ subboxes
+$\times\,3$ iterations, weighted Landy--Szalay per subbox/scheme, $C/64$ to
+full-box volume --- no new simulations).  For each scheme we form the
+central-difference derivative of the $90$-bin weighted vector
+(data/arand/cross $\times\,\ell{=}0,2\times15$ bins) and the HOD-fixed marginalised
+$\sigma$ on $\{\omega_b,\omega_c,n_s,\ln\sigma_8\}$, against the quantile
+full-sample auto ($30$ bins, $C_{\rm subbox}/64$).
+
+\begin{table}[h]
+  \centering
+  \caption{HOD-fixed marginalised $\sigma$ at full-box ($2000\,h^{-1}$Mpc) volume,
+  and the gain (quantile-full-auto $\sigma$ / weighted $\sigma$; $>\!1$ = weighted
+  tighter).  Hartlap $0.52$ ($90$ bins, $192$ pooled cov samples); quantile
+  reference Hartlap $0.51$.}
+  \begin{tabular}{lcccc}
+    \hline
+    scheme & $\omega_b$ & $\omega_c$ & $n_s$ & $\ln\sigma_8$ \\
+    \hline
+    quantile full-auto & $8.77\!\times\!10^{-3}$ & $3.11\!\times\!10^{-3}$ & $1.28\!\times\!10^{-3}$ & $6.72\!\times\!10^{-3}$ \\
+    \hline
+    rank (CDF)  & $1.57\times$ & $\mathbf{1.87\times}$ & $\mathbf{1.78\times}$ & $1.34\times$ \\
+    power       & $\mathbf{1.67\times}$ & $1.60\times$ & $1.62\times$ & $1.28\times$ \\
+    knot        & $1.52\times$ & $1.77\times$ & $1.72\times$ & $1.20\times$ \\
+    uniform     & $1.57\times$ & $1.60\times$ & $1.65\times$ & $1.26\times$ \\
+    exp         & $1.55\times$ & $1.43\times$ & $1.44\times$ & $1.26\times$ \\
+    void        & $1.37\times$ & $1.50\times$ & $1.43\times$ & $1.28\times$ \\
+    signed mark & $\mathbf{2.03\times}$ & $0.88\times$ & $0.84\times$ & $\mathbf{1.68\times}$ \\
+    \hline
+  \end{tabular}
+  \label{tab:fisher}
+\end{table}
+
+Findings: (i)~\emph{every positive scheme tightens all four parameters}
+($1.2$--$1.9\times$) over the quantile full-auto, at a benign Hartlap factor ---
+not a binning artefact.  (ii)~\code{rank} (the CDF mark) is the best-balanced
+scheme, strongest on $\omega_c$ and $n_s$.  (iii)~The \code{signed} marked
+correlation is the specialist: best on $\omega_b$ ($2.03\times$) and $\sigma_8$
+($1.68\times$) --- the amplitude/RSD-sensitive parameters --- but \emph{worse} than
+the quantile on $\omega_c/n_s$, whose constraint leans on the broadband shape the
+zero-mean mark discards.
+
+Two honest caveats keep these as \emph{relative} numbers.  The weighted vector
+bundles three legs (data-auto, ASTRA-random auto, cross; $90$ bins) against the
+single quantile leg ($30$ bins), so part of the gain is "more legs," not the
+weighting alone; a fairer baseline is the best quantile \emph{multi}-leg vector.
+And the $\pm$ pairs use matched-but-mismatched single HODs, so every derivative
+here carries the same HOD contamination the quantile Fisher had before the Tier-1 /
+global-response correction (the $\sigma_8$ row worst).  The absolute $\sigma$ are
+therefore optimistic; the head-to-head ratios are the result.  The HOD-clean
+upgrade is the weighted analogue on the $50$-draw HOD ensemble per cosmology with
+the global-response derivatives.
+
 \section{Outlook}
-Once validated, the weighted vectors can be dropped into the existing
-Fisher/emulability machinery for a like-for-like comparison against the quantile
-legs: do the continuous weights carry the same (or more) cosmological information
-at a lower data-vector dimension, and are they more emulable (smoother in the
-parameters)?  Natural extensions are tunable exponents (the \code{power}/\code{exp}
-knobs), cross-weightings (void-weighted $\times$ knot-weighted, the continuous
-analog of the void/knot cross legs that were the Fisher workhorses), and the
-standardised zero-mean mark (the mark variance / density-fluctuation weighting).
+The continuous weights pass the bar: they carry cosmological information
+competitive with --- and on this grid tighter than --- the quantile legs, at a
+differentiable (emulator-friendly) form with no bin-edge discontinuities.  Next
+are the HOD-clean ensemble Fisher (to remove the optimism above), an emulability
+test of the weighted vs quantile vectors, tunable exponents (the
+\code{power}/\code{exp} knobs), cross-weightings (void-weighted $\times$
+knot-weighted, the continuous analog of the void/knot cross legs that were the
+Fisher workhorses), and the standardised zero-mean mark.
 
 \begin{thebibliography}{9}
 \bibitem{Sheth2005} R.~K.~Sheth, ``Marked correlations,'' MNRAS \textbf{364} (2005) 796.

@@ -996,8 +996,21 @@ object per iteration so weighting can be redone without re-running the Delaunay.
   central-difference derivatives per scheme + HOD-fixed Fisher and prints marginalised
   σ{ω_b,ω_c,n_s,lnσ₈} per scheme vs the quantile full-auto baseline with gain ratios + a bar
   figure.
-- **NEXT:** when the 8 runs + covariance land (~half day), run `fisher_weighted_compare.py`
-  and read which scheme/parameter the weighting beats the quantile legs on. If promising, the
-  non-minimal follow-up is the HOD-CLEAN version — weighted ξ on the 50-draw HOD ensemble per
-  cosmology (~400 runs, global-response derivatives) — and an emulability test of the
-  weighted vectors vs the quantile legs.
+- **RESULT (2026-06-29, all 8 ± runs + reanalysis cov landed):** the continuous mark BEATS
+  the quantile full-auto on every parameter. HOD-fixed marg σ, gain = quantile/weighted (>1 =
+  weighted tighter): **every positive scheme tightens all four params 1.2–1.9×** at benign
+  Hartlap (0.52, 90 bins, 192 pooled cov samples). **`rank` (CDF) best-balanced** (ω_b 1.57×,
+  ω_c 1.87×, n_s 1.78×, σ₈ 1.34×); **`signed` mark is the specialist** — best on ω_b 2.03× and
+  σ₈ 1.68× (amplitude/RSD-sensitive) but *worse* on ω_c/n_s (0.88×/0.84×, discards broadband).
+  Table in `notes/weighted_2pcf` (tab:fisher); fig `plots/fullbox_weighted/fisher_weighted_compare.png`;
+  npz `data/fullbox_weighted/cov/fisher_weighted_compare.npz`.
+  - **Two honest caveats → read RATIOS not absolute σ:** (a) the weighted vector bundles 3 legs
+    (data+arand+cross, 90 bins) vs the single quantile leg (30 bins), so part of the gain is
+    "more legs"; a fairer baseline is the best quantile *multi*-leg vector. (b) matched
+    single-HOD ± pairs carry the same HOD contamination as the pre-Tier-1 quantile Fisher (σ
+    optimistic, σ₈ worst).
+- **Strand PAUSED here (user decision 2026-06-29):** result written up + committed. The
+  non-minimal follow-ups when resumed: HOD-CLEAN weighted ξ on the 50-draw HOD ensemble per
+  cosmology (~400 runs, global-response derivatives) to remove the optimism; fairer quantile
+  multi-leg baseline + per-leg breakdown (cross vs arand) from cached data; emulability test of
+  the weighted vs quantile vectors; tunable exponents and void×knot cross-weightings.
