@@ -1009,8 +1009,30 @@ object per iteration so weighting can be redone without re-running the Delaunay.
     "more legs"; a fairer baseline is the best quantile *multi*-leg vector. (b) matched
     single-HOD ± pairs carry the same HOD contamination as the pre-Tier-1 quantile Fisher (σ
     optimistic, σ₈ worst).
-- **Strand PAUSED here (user decision 2026-06-29):** result written up + committed. The
-  non-minimal follow-ups when resumed: HOD-CLEAN weighted ξ on the 50-draw HOD ensemble per
-  cosmology (~400 runs, global-response derivatives) to remove the optimism; fairer quantile
-  multi-leg baseline + per-leg breakdown (cross vs arand) from cached data; emulability test of
-  the weighted vs quantile vectors; tunable exponents and void×knot cross-weightings.
+- **FAIRER BASELINE + PER-LEG BREAKDOWN (2026-06-29, `fisher_weighted_breakdown.py`) — the
+  headline REVERSES.** The "weighted wins" above held ONLY against the single quantile
+  full-auto. Three cached-data findings:
+  1. **Re-weighting one population adds nothing.** Controlled test (weighted `uniform`
+     data-auto == standard ξ, so re-weighting the SAME data population isolates the mark's
+     pure effect): no scheme beats standard ξ on the clean params (knot/rank/power/exp
+     0.75–0.99×); broadband marks (void, signed) LOSE info on ω_c/n_s (down to 0.42×); signed
+     gains only on ω_b 1.06×/σ₈ 1.19×. A scalar mark is a weighted pair-count average — it
+     can't carry more cosmology than the unweighted ξ of that population.
+  2. **The gain was the LEGS, not the weight.** In the 90-bin weighted vector the data-auto is
+     the workhorse; arand-auto and cross alone are 2–4× looser; combining all three tightens
+     ~1.3–1.5× — i.e. the win over the single quantile full-auto was "more legs," the caveat.
+  3. **Against the quantile MULTI-leg vectors, weighting LOSES on every param.** With the proper
+     pooled 576-subbox cov: quantile data-Q autos (120b) and full+data+rand Q autos (270b) beat
+     weighted-full by 1.3–5× (worst ω_b: quantile 1.05e-3 vs weighted rank 5.59e-3 = 5×). The
+     quantile splits keep the full conditional set {ξ_ab}, strictly more info than any scalar
+     reweight. (Weighted side even has the Hartlap DISADVANTAGE — 192 vs 576 cov samples.)
+  - **Reframe:** the continuous mark is a COMPRESSION of environment info → loses raw σ vs the
+    quantile splits. Its case rests on secondary properties (lower-dim, differentiable/emulable,
+    marked-stats theory), NOT tighter Fisher errors. Plots: `weighted_perleg_breakdown.png`
+    (σ per sub-vector), `weighted_legs_measured.png` (the measured legs); npz
+    `data/fullbox_weighted/cov/fisher_weighted_breakdown.npz`.
+- **Strand PAUSED here (user decision 2026-06-29):** results written up + committed. The
+  decisive next test before any larger weighted campaign is the **emulability head-to-head**
+  (weighted vs quantile vectors) — that, not raw σ, is where the mark could still win. HOD-clean
+  weighted ξ on the 50-draw ensemble + tunable exponents / void×knot cross-weights remain
+  optional follow-ups.
