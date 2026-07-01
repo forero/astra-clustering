@@ -1036,3 +1036,59 @@ object per iteration so weighting can be redone without re-running the Delaunay.
   (weighted vs quantile vectors) — that, not raw σ, is where the mark could still win. HOD-clean
   weighted ξ on the 50-draw ensemble + tunable exponents / void×knot cross-weights remain
   optional follow-ups.
+
+### Emulability head-to-head: quantile still wins (2026-06-30)
+
+Ran the decisive test flagged above. `queue/launch_weighted_c000_ensemble.sh` submitted the
+weighted pipeline on the same 50 maximin c000 HODs already used by the quantile emulator (49
+new runs, hod484 already done); `scripts/emulability_weighted_vs_quantile.py` runs the SAME
+PCA+GP leave-one-out recipe on both sides and reports (1) emulability alone — median LOO
+RMS/spread — and (2) the decisive metric, emulator-aware Fisher σ_tot = Fisher(C_CV + C_emu)
+with C_emu from LOO residuals (SUNBIRD-style).
+
+- **Emulability alone: the mark genuinely wins.** Best weighted schemes (signed 0.218, knot
+  0.230) are at or slightly below the quantile full-auto (0.245).
+- **But σ_tot still favors quantile on every parameter, even picking the best weighted scheme
+  per parameter:** σ_tot ratio quantile/weighted = 0.46–0.78× (quantile 1.3–2.2× tighter). The
+  quantile multi-leg vector's much smaller raw σ_CV survives its own (larger) emulator tax and
+  still ends up ahead of any weighted scheme's σ_tot.
+- **Conclusion: across raw σ, per-leg breakdown, and emulator-aware σ, the continuous mark has
+  not beaten the quantile splits on any tested axis.** Plots `emulability_rms_per_leg.png`,
+  `emulability_fisher_tax.png`; npz `data/fullbox_weighted/cov/emulability_compare.npz`.
+
+### Class-probability weighting: tried and dropped (2026-06-30)
+
+Distinct idea from the continuous mark above: estimate a per-galaxy PROBABILITY of belonging
+to each of the 4 discrete ASTRA classes (void/sheet/filament/knot, fixed r-thresholds, not
+quantiles) by averaging classification over ≥10 ASTRA iterations —
+P_class(i) = fraction of iterations where galaxy i's r falls in that class — reducing
+per-iteration classification noise for boundary galaxies. ONLY data is weighted (astra_randoms
+excluded); geometry randoms stay the unweighted LS reference. `pipeline_fullbox_classprob.py`
+ran on c000/hod484 (10 iterations — 3 reused from the weighted pipeline's r-value cache, 7
+new; 40 min on a full node).
+
+- **P_class construction is validated:** sum_c P_class = 1 exactly; aggregate <P_class>
+  matches the single-iteration class fractions closely; ~50% of galaxies get a stable (≥0.9)
+  classification, the rest split smoothly toward 0.5 (boundary flips happen between adjacent
+  classes only, never across all 4).
+- **Structural problem: ASTRA's fixed thresholds give wildly unequal class sizes** — void
+  0.08%, sheet 47.8%, filament 51.8%, knot 0.38% of galaxies — unlike the quantile scheme's
+  forced 25% per bin. Mean-population weight normalisation (w = P_class/⟨P_class⟩) blows up
+  per-object weights for the rare classes by ~250–1000×, so the void/knot **auto**-correlations
+  (weight-squared in the pair sum) are shot-noise garbage: knot_auto ξ₀ spikes to +3200 at
+  small s, quadrupole oscillates wildly between −500/−900, vs O(10–100) for the quantile
+  baselines and for sheet/filament (populous, ~50% each, look fine).
+- **The full×class-weighted crosses (weight enters linearly, not squared) look physically
+  sensible by contrast** — full×void negative, full×knot positive, sane O(10–200) amplitudes,
+  matching the expected sign pattern — but no noise estimate exists for any of these
+  single-measurement statistics (the design skips iteration-averaging since classification
+  noise is meant to be pre-marginalised into P_class, which doesn't cover shot noise from a
+  tiny population).
+- **User decision: stop and drop this idea** rather than pursue a subbox-jackknife noise
+  estimate or a renormalisation fix. Code (`scripts/pipeline_fullbox_classprob.py`,
+  `scripts/plot_fullbox_classprob.py`, `queue/run_fullbox_classprob.sh`), the c000/hod484
+  measurement, and diagnostic plots (`classprob_stability.png`, `classprob_auto_multipoles.png`,
+  `classprob_cross_multipoles.png`) are kept as the record.
+
+**The entire weighted-2PCF / class-probability strand is now closed.** Future ASTRA
+data-vector work returns to the quantile-split machinery.
