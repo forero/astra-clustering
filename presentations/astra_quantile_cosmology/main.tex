@@ -35,7 +35,7 @@
 
 \begin{document}
 
-% ---------------------------------------------------------------
+% =================================================================
 \begin{frame}
 \titlepage
 \end{frame}
@@ -51,7 +51,7 @@
 \begin{frame}{Why go beyond the two-point correlation function?}
 \begin{itemize}
 \item The standard cosmological probe is the galaxy two-point correlation function
-  (2PCF) $\xi(s)$ --- a single number per separation bin, averaged over \emph{all}
+  (2PCF) $\xi(s)$: a single number per separation bin, averaged over \emph{all}
   environments.
 \item But galaxies live in very different places: deep voids, sheets, filaments,
   dense knots. These environments respond differently to:
@@ -60,7 +60,7 @@
     \item \textbf{galaxy--halo physics} (the HOD: how galaxies populate halos)
   \end{itemize}
 \item \textbf{The bet:} if we split clustering \emph{by local environment}, we get
-  extra handles that respond differently to these two effects --- breaking
+  extra handles that respond differently to these two effects, breaking
   degeneracies that the plain 2PCF cannot.
 \end{itemize}
 \vspace{4pt}
@@ -99,7 +99,7 @@ Knot      & $0.9 < r \le 1$       & almost all neighbours are data \\
 Galaxies (and, independently, randoms) are then split into \textbf{quantiles} of
 $r$: Q1 = most underdense $\to$ Q4 = most overdense. Quantiles use \emph{equal
 counts}; the physical void/sheet/filament/knot classes above do not (voids and
-knots turn out to be tiny populations --- more on this later).
+knots turn out to be tiny populations; more on this later).
 \end{frame}
 
 \begin{frame}{From classification to a data vector: the ASTRA ``legs''}
@@ -107,9 +107,9 @@ Once every data and random point has an $r$ (hence a quantile label $Q1$--$Q4$),
 we measure the redshift-space multipoles $\xi_\ell(s)$ ($\ell=0$ monopole,
 $\ell=2$ quadrupole) of every combination:
 \begin{itemize}
-\item \textbf{full sample auto} --- the plain 2PCF baseline
+\item \textbf{full sample auto}: the plain 2PCF baseline
 \item \textbf{data quantile autos} $dQ1..dQ4$
-\item \textbf{random quantile autos} $rQ1..rQ4$ (yes --- ASTRA randoms trace the
+\item \textbf{random quantile autos} $rQ1..rQ4$ (yes: ASTRA randoms trace the
   same cosmic web, so their quantiles cluster too!)
 \item \textbf{full $\times$ data-quantile crosses} $xdQ1..xdQ4$
 \item \textbf{full $\times$ random-quantile crosses} $xrQ1..xrQ4$
@@ -142,7 +142,7 @@ machinery, applied per environment.
 \centering
 \includegraphics[width=0.8\textwidth]{data_multipoles_all_quantiles.png}
 \begin{block}{Bottom line}
-\small A clean monotonic ordering Q1 $<$ Q2 $<$ Q3 $<$ Q4 in clustering amplitude ---
+\small A clean monotonic ordering Q1 $<$ Q2 $<$ Q3 $<$ Q4 in clustering amplitude:
 knots cluster far more strongly than the general sample, voids barely at all: the
 expected cosmic-web signature, from a Delaunay triangulation and a standard 2PCF.
 \end{block}
@@ -163,7 +163,7 @@ P(k\!=\!0) = \int \xi(r)\,d^3r .
   small-scale positive correlation must be compensated by a shallow negative tail.
   Every overdense region sits in a slightly underdense larger environment.
 \item The crossing scale tracks the horizon at matter--radiation equality
-  (Prada et al.\ 2011) --- a standard ruler, $s_0\approx125$--$130\Mpch$ in
+  (Prada et al.\ 2011), a standard ruler, $s_0\approx125$--$130\Mpch$ in
   linear theory.
 \item At leading order, bias and Kaiser RSD only \emph{rescale} $\xi$:
   $\xi_g = b^2\xi_m$. They cannot move the zero. \textbf{Every linearly biased
@@ -171,8 +171,8 @@ P(k\!=\!0) = \int \xi(r)\,d^3r .
 \end{itemize}
 \begin{alertblock}{Why this matters for ASTRA}
 If our environment-selected quantiles are behaving as genuine, linearly biased
-tracers of the same underlying field --- not noise, not an artefact of the
-classification --- they must all share this crossing.
+tracers of the same underlying field (not noise, not an artefact of the
+classification), they must all share this crossing.
 \end{alertblock}
 \end{frame}
 
@@ -203,7 +203,7 @@ strongly than voids), \textbf{every} data and random quantile auto- and
 cross-correlation crosses zero at the same $s_0\simeq117$--$123\Mpch$ (Q1's cross
 approaches zero from below, consistent with anti-biased voids). This is a
 non-trivial, passed consistency test: ASTRA quantiles behave as genuine linearly
-biased tracers of the same cosmic density field --- real physics, not classification
+biased tracers of the same cosmic density field: real physics, not classification
 noise.
 \end{block}
 \end{frame}
@@ -226,7 +226,7 @@ F_{\alpha\beta} = \frac{\partial\boldsymbol\xi}{\partial\theta_\alpha}^{\!\top}
   $\partial\xi/\partial\theta$ and the \textbf{covariance} $\mathsf C$.
 \item The inverse covariance estimated from $N$ samples over $p$ bins is biased;
   we apply the Hartlap correction $(N-p-2)/(N-1)$ throughout. This is what caps
-  how long a data vector can be for a fixed number of covariance samples --- a
+  how long a data vector can be for a fixed number of covariance samples: a
   recurring theme below.
 \item Target parameters: $\{\omega_b,\omega_{cdm},n_s,\sigma_8\}$.
 \end{itemize}
@@ -264,7 +264,7 @@ difference.
 \end{alertblock}
 \begin{itemize}
 \item Measured directly, the $\texttt{c100}-\texttt{c101}$ difference is a
-  scale-dependent $-6\%$ to $+9\%$ tilt in $\xi_0$ --- against a $\sim\!1\%$
+  scale-dependent $-6\%$ to $+9\%$ tilt in $\xi_0$, against a $\sim\!1\%$
   physical $\omega_b$ signal.
 \item The $\sigma_8$ pair difference loses $\sim\!89\%$ of its amplitude to a
   cancelling HOD mismatch. One-sided or naive paired derivatives are unusable
@@ -284,7 +284,7 @@ ASTRA-iteration scatter.
 \begin{block}{Bottom line}
 \small For the three already-clean parameters, subbox and full-box derivatives
 agree to $\approx\!3\%$. For $\sigma_8$, removing derivative \emph{noise}
-tightens $\sigma(\ln\sigma_8)$ by $\sim\!1.8\times$ --- but this fixes noise,
+tightens $\sigma(\ln\sigma_8)$ by $\sim\!1.8\times$, but this fixes noise,
 not the HOD contamination \emph{bias} above.
 \end{block}
 \end{frame}
@@ -298,15 +298,15 @@ then subtract the modelled contamination from each pair's derivative.
 \includegraphics[width=0.72\textwidth]{hod_contamination_lns8.png}
 \begin{block}{Bottom line}
 \small Linear theory predicts $\partial\xi/\partial\ln\sigma_8 = 2\xi$. The raw
-derivative was only $11\%$ of that; the corrected derivative recovers $136\%$
---- back in the right regime. The contamination (orange) rivals or exceeds the
+derivative was only $11\%$ of that; the corrected derivative recovers $136\%$,
+back in the right regime. The contamination (orange) rivals or exceeds the
 raw signal (black) everywhere: these derivatives were unusable before this fix.
 \end{block}
 \end{frame}
 
 \begin{frame}{Covariance: pooling across cosmologies}
 \begin{itemize}
-\item The 64 fiducial subboxes alone cap the data vector at $p<64$ bins ---
+\item The 64 fiducial subboxes alone cap the data vector at $p<64$ bins:
   adding the quadrupole to the quantile vectors pushes Hartlap negative.
 \item Since the covariance varies far more slowly with cosmology than the mean
   does, we pool mean-subtracted subboxes across all \textbf{nine} cosmologies:
@@ -318,7 +318,7 @@ raw signal (black) everywhere: these derivatives were unusable before this fix.
 \]
 \end{itemize}
 \begin{block}{Bottom line}
-With $N=576$ the Hartlap factor stays $\gtrsim\!0.75$ even at $p=144$ bins --- this
+With $N=576$ the Hartlap factor stays $\gtrsim\!0.75$ even at $p=144$ bins: this
 single change is what lets the quadrupole and the random-quantile legs into the
 data vector at all.
 \end{block}
@@ -337,7 +337,7 @@ marginalise the HOD under a Gaussian yuan23 prior, for the plain full-sample 2PC
 \includegraphics[width=0.44\textwidth]{fisher_joint_marginalisation.png}
 \begin{block}{Bottom line}
 \footnotesize Marginalising over the 12 HOD nuisance parameters degrades every
-cosmological error --- worst for $\omega_b$ (\textbf{9.7$\times$}), mildest for
+cosmological error, worst for $\omega_b$ (\textbf{9.7$\times$}), mildest for
 $\omega_{cdm}$ (1.6$\times$). This is the honest starting point: exactly what a
 smarter data vector needs to claw back.
 \end{block}
@@ -348,7 +348,7 @@ smarter data vector needs to claw back.
 \includegraphics[width=0.52\textwidth]{fisher_joint_convergence.png}
 \begin{block}{Bottom line}
 \small Every parameter's marginalised error plateaus after $\sim\!4$ marginalised
-HOD directions and stays flat through all 12 --- the correction is robust to the
+HOD directions and stays flat through all 12: the correction is robust to the
 prior tail, not an artefact of how the HOD prior was modelled.
 \end{block}
 \end{frame}
@@ -382,7 +382,7 @@ data Q autos (mono$+$quad) & 64 & 0.89 & $1.46$ & $5.51$ & $18.1$ \\
 \begin{alertblock}{Bottom line}
 Adding the ASTRA environment quantiles \emph{and} the quadrupole to the plain
 2PCF tightens every parameter by \textbf{1.9$\times$ ($\omega_b$), 2.1$\times$
-($\omega_{cdm}$), 3.4$\times$ ($n_s$)} --- \emph{after} full HOD marginalisation.
+($\omega_{cdm}$), 3.4$\times$ ($n_s$)}, \emph{after} full HOD marginalisation.
 The earlier finding that ``the quadrupole adds nothing'' was a Hartlap-budget
 artefact of the smaller 64-subbox covariance; with the pooled covariance both the
 environment split and the quadrupole are real, independent information.
@@ -431,14 +431,14 @@ HOD-marginalised figure of merit $\FoM_3 = [\det{\rm Cov}_3]^{-1/2}$.
 \includegraphics[width=0.36\textwidth]{pair_gain_heatmap.png}
 \begin{block}{Bottom line}
 \footnotesize One cell dominates the entire $16\times16$ grid: \textbf{full$+xrQ4+xrQ1$}
-(full sample crossed with the knot- and void-environment \emph{randoms}) --- the
+(full sample crossed with the knot- and void-environment \emph{randoms}): the
 brightest square on the map, outscoring every other combination.
 \end{block}
 \end{frame}
 
 \begin{frame}{Warning sign: is this just noise?}
 \footnotesize The naive ranking is dominated by vectors with a \textbf{random}-quantile
-leg (gains up to $55\times$) --- surprising, since random quadrupoles are known to
+leg (gains up to $55\times$), surprising since random quadrupoles are known to
 be noise-limited. Test~1: subtract the derivative-noise bias
 $\mathrm{Tr}(C^{-1}\mathrm{Cov}(\delta))$ from every candidate.
 
@@ -446,7 +446,7 @@ $\mathrm{Tr}(C^{-1}\mathrm{Cov}(\delta))$ from every candidate.
 \includegraphics[width=0.72\textwidth]{noise_aware_ranking.png}
 \begin{block}{Bottom line}
 \footnotesize The full auto has zero correction (a clean check); the random legs
-($\star$) deflate only $\sim\!25$--$40\%$ and \textbf{stay on top} --- their
+($\star$) deflate only $\sim\!25$--$40\%$ and \textbf{stay on top}: their
 environment-classified \emph{monopoles} carry real signal, not noise.
 \end{block}
 \end{frame}
@@ -460,7 +460,7 @@ random-leg derivatives.
 \includegraphics[width=0.8\textwidth]{nonlinear_response.png}
 \begin{block}{Bottom line}
 \footnotesize (a) Data legs (green) move \emph{as much or more} than random legs
-(red) when nonlinearity is added. (b) Ranking unchanged --- random legs still on
+(red) when nonlinearity is added. (b) Ranking unchanged: random legs still on
 top. Nonlinearity does not single them out either.
 \end{block}
 \end{frame}
@@ -491,8 +491,8 @@ for strong Fisher leverage from two extra statistics.
 \centering
 \includegraphics[height=0.66\textheight]{fisher_compare_full_vs_5stem.png}
 \begin{block}{Bottom line}
-\footnotesize Adding \emph{only two} statistics --- the void and knot random
-crosses --- to the plain 2PCF already gives $\FoM_3=48\times$
+\footnotesize Adding \emph{only two} statistics (the void and knot random
+crosses) to the plain 2PCF already gives $\FoM_3=48\times$
 ($\omega_b\,2.8\times$, $\omega_{cdm}\,3.6\times$, $n_s\,3.1\times$):
 \textbf{more than the entire five-stem data-quantile vector}. Ellipses are smaller
 \emph{and} rotated.
@@ -505,7 +505,7 @@ crosses --- to the plain 2PCF already gives $\FoM_3=48\times$
 \begin{block}{Bottom line}
 \footnotesize Greedy selection over all 16 stems picks the void/knot random
 crosses \emph{first} ($1\to48\times$); three more data legs push the 6-statistic
-vector to $\FoM_3\!\simeq\!210\times$ --- $\sigma(\omega_b)\,5.2\times$,
+vector to $\FoM_3\!\simeq\!210\times$: $\sigma(\omega_b)\,5.2\times$,
 $\sigma(\omega_{cdm})\,7.6\times$, $\sigma(n_s)\,4.8\times$,
 $\sigma(\sigma_8)\,2.7\times$ tighter than the plain 2PCF.
 \end{block}
@@ -518,7 +518,7 @@ $\sigma(\sigma_8)\,2.7\times$ tighter than the plain 2PCF.
 \footnotesize Grey = plain 2PCF, green = the conservative data-only optimal
 vector ($32\times$), blue = the all-stems ceiling led by the void/knot random
 crosses ($210\times$). Both shrink \emph{and rotate} the ellipses relative to the
-2PCF --- genuine degeneracy-breaking, not just a smaller error bar.
+2PCF: genuine degeneracy-breaking, not just a smaller error bar.
 \end{block}
 \end{frame}
 
@@ -549,7 +549,7 @@ validated:
 \item Realistic covariance $C=C_{\rm CV}+C_{\rm emu}$ (cosmic variance
   \emph{plus} emulator error), not the optimistic $C_{\rm CV}$ alone.
 \item The \textbf{curated vector} the emulator campaign settled on is exactly
-  full 2PCF $+$ the void-random cross monopole --- the same $xrQ1$ leg that led
+  full 2PCF $+$ the void-random cross monopole, the same $xrQ1$ leg that led
   the greedy chain above, now re-derived independently by the emulator pipeline.
 \end{itemize}
 \end{frame}
@@ -560,24 +560,25 @@ validated:
 \begin{block}{Bottom line}
 \footnotesize Even with the realistic $C_{\rm CV}+C_{\rm emu}$ covariance (cosmic
 variance \emph{plus} measured emulator error) over all 8 $w_0w_a$CDM$+$
-parameters: the curated vector (2PCF $+$ void-random cross) gives FoM $14\times$;
-full ASTRA gives $150\times$ --- again far exceeding the $\times1.1$--$2.2$
-per-parameter gain, the degeneracy-breaking signature. Validated end-to-end
-against an MCMC.
+parameters: the curated vector (2PCF $+$ void-random cross) gives FoM
+$13\times$; full ASTRA (2PCF $+$ the eight extreme void/knot data and random
+stems, mono$+$quad) gives $124\times$, again far exceeding the
+$\times1.2$--$2.5$ per-parameter gain: the degeneracy-breaking signature.
+Validated end-to-end against an MCMC.
 \end{block}
 \end{frame}
 
 \begin{frame}{The key strategic insight}
 \begin{alertblock}{The value-add is emulator-gated, not information-limited}
 ASTRA (and any environment or marked statistic) carries real cosmological
-information --- the Fisher gains above are real. But that information is only
+information: the Fisher gains above are real. But that information is only
 \emph{realisable in inference} once the emulator error on the environment legs
 falls below cosmic variance.
 \end{alertblock}
 \begin{itemize}
 \item This reframes the open question from \emph{``does the statistic
   help?''} (yes, robustly, by every test in this talk) to \emph{``can we emulate
-  it accurately enough?''} --- a concrete, quantitative, and \emph{solvable}
+  it accurately enough?''}, a concrete, quantitative, and \emph{solvable}
   target (denser cosmology coverage, the dominant lever).
 \item It is a general lesson for any simulation-based-inference programme built
   on marked or environment-split statistics, not just ASTRA.
@@ -590,17 +591,17 @@ falls below cosmic variance.
 
 \begin{frame}{Bottom line: why ASTRA has real potential for cosmology}
 \begin{enumerate}
-\item \textbf{The classification is physical, not a fitting artefact} --- every
+\item \textbf{The classification is physical, not a fitting artefact}: every
   ASTRA statistic obeys the same zero-crossing consistency test as the plain
   2PCF.
-\item \textbf{The information is real and survives scrutiny} --- vindicated
+\item \textbf{The information is real and survives scrutiny}: vindicated
   against derivative-noise and nonlinear-HOD-response robustness checks, and
   against a full joint cosmology$+$HOD marginalisation, not just fixed-HOD
   optimism.
 \item \textbf{One leg does most of the work}: the full$\times$void-random cross
   ($xrQ1$), paired with its knot mirror image ($xrQ4$), turns just \emph{two}
-  extra statistics into $\FoM_3=48\times$ --- more than an entire five-stem
-  data-quantile vector --- traced to a specific, interpretable mechanism
+  extra statistics into $\FoM_3=48\times$, more than an entire five-stem
+  data-quantile vector, traced to a specific, interpretable mechanism
   (opposite signal, opposite response, anti-correlated noise) and a specific
   scale range ($s\lesssim40\Mpch$). It resurfaces independently as the emulator
   campaign's own curated vector.
