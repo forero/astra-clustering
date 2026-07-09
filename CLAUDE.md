@@ -113,6 +113,7 @@ astra-clustering/
 ├── plots/            ← figure output; mirrors the data/ layout
 ├── notes/            ← LaTeX technical notes (zero_crossing/, fisher/, vector_search/, tier3_emulator/,
 │                       fisher_emulator/, project_summary/); LaTeX .aux/.log/.out are gitignored
+├── presentations/    ← beamer decks; astra_quantile_cosmology/ is the quantile-split talk
 ├── CLAUDE.md
 └── README.md
 ```
@@ -1092,3 +1093,33 @@ new; 40 min on a full node).
 
 **The entire weighted-2PCF / class-probability strand is now closed.** Future ASTRA
 data-vector work returns to the quantile-split machinery.
+
+### Beamer presentation: the quantile-split story, end to end (2026-07-09)
+
+`presentations/astra_quantile_cosmology/main.tex` (35 slides, 16:9) is a self-contained
+talk covering the quantile-split ASTRA programme only (the weighted-2PCF/class-probability
+strand above is deliberately excluded). Sourced directly from `notes/zero_crossing/`,
+`notes/fisher/`, `notes/vector_search/` and `notes/fisher_emulator/` rather than from
+memory, so all numbers trace back to a technical note. `\graphicspath` pulls figures
+straight from `plots/` — no copies. Build with `module load texlive && pdflatex main.tex`
+(×2 for the TOC); rasterize for visual QA with
+`gs -sDEVICE=png16m -r100 -dBATCH -dNOPAUSE -dSAFER -o slide-%02d.png main.pdf`
+(`pdftoppm`/PyMuPDF are not available in this environment, `gs`/`convert`/`magick` are).
+
+Narrative arc: motivation → ASTRA method/math → zero-crossing validation → Fisher
+formalism + the HOD-contamination lesson (Tiers 0/1) → joint cosmology+HOD Fisher →
+**why the full$\times$void-random cross (`xrQ1`) and its knot mirror image (`xrQ4`)
+carry the single largest chunk of Fisher information** (systematic search → two
+robustness checks → the mirror-image mechanism → the payoff corner plot, two added
+statistics beating a five-stem data-quantile vector → the full greedy chain → the
+side-by-side forecast → the small-scale scale-cut) → the same `xrQ1` leg resurfacing,
+independently, as the emulator campaign's own curated vector, now under a realistic
+$C_{\rm CV}+C_{\rm emu}$ budget → conclusion.
+
+Layout lesson worth keeping: `\small intro text\n\centering\n\includegraphics{...}`
+with no blank line between the text and `\centering` lets LaTeX treat the image as
+inline content mid-paragraph, so the image lands mid-sentence with text wrapping
+around it instead of below it. Fix is a blank line (paragraph break) before
+`\centering` whenever text precedes a centred image in a frame. Caught by rendering
+every slide to PNG (`gs`) and reading them back with the Read tool — compiling
+clean (no LaTeX warnings) does not catch this class of bug.

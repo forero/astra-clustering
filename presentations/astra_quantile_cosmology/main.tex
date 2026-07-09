@@ -1,0 +1,634 @@
+\documentclass[aspectratio=169,11pt]{beamer}
+
+\usetheme{Madrid}
+\usecolortheme{default}
+\setbeamertemplate{navigation symbols}{}
+\setbeamertemplate{footline}[frame number]
+\setbeamercovered{transparent}
+
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{xcolor}
+
+\graphicspath{%
+  {../../plots/}%
+  {../../plots/c000_hod484/}%
+  {../../plots/derivatives/}%
+  {../../plots/vector_search/}%
+  {../../plots/emulator_tier3/}%
+}
+
+\newcommand{\Mpch}{\,h^{-1}\mathrm{Mpc}}
+\newcommand{\ombh}{\omega_b}
+\newcommand{\omch}{\omega_{cdm}}
+\newcommand{\code}[1]{\texttt{#1}}
+\newcommand{\FoM}{\mathrm{FoM}}
+
+\title[ASTRA cosmic-web clustering]{ASTRA: cosmic-web environment splitting\\ as a cosmological probe}
+\subtitle{Quantile-split clustering results: math, validation, and Fisher forecasts}
+\author{ASTRA clustering project}
+\institute{}
+\date{2026}
+
+\begin{document}
+
+% ---------------------------------------------------------------
+\begin{frame}
+\titlepage
+\end{frame}
+
+\begin{frame}{Outline}
+\tableofcontents
+\end{frame}
+
+% =================================================================
+\section{Motivation}
+% =================================================================
+
+\begin{frame}{Why go beyond the two-point correlation function?}
+\begin{itemize}
+\item The standard cosmological probe is the galaxy two-point correlation function
+  (2PCF) $\xi(s)$ --- a single number per separation bin, averaged over \emph{all}
+  environments.
+\item But galaxies live in very different places: deep voids, sheets, filaments,
+  dense knots. These environments respond differently to:
+  \begin{itemize}
+    \item \textbf{cosmology} (growth of structure, $\sigma_8$, $\omega_{cdm}$, \ldots)
+    \item \textbf{galaxy--halo physics} (the HOD: how galaxies populate halos)
+  \end{itemize}
+\item \textbf{The bet:} if we split clustering \emph{by local environment}, we get
+  extra handles that respond differently to these two effects --- breaking
+  degeneracies that the plain 2PCF cannot.
+\end{itemize}
+\vspace{4pt}
+\begin{alertblock}{This talk}
+Can we actually classify environment cheaply and robustly, measure real physics
+with it, and turn that into tighter cosmological constraints? We answer this with
+the ASTRA method on AbacusSummit simulations.
+\end{alertblock}
+\end{frame}
+
+% =================================================================
+\section{The ASTRA method}
+% =================================================================
+
+\begin{frame}{ASTRA: classifying the cosmic web}
+\textbf{Idea:} build a Delaunay tessellation over data $+$ random points; a point's
+local density is read off from how many of its tessellation neighbours are data vs.\
+random.
+\[
+r \;=\; \frac{n_{\rm data} - n_{\rm rand}}{n_{\rm data} + n_{\rm rand}} \;\in\; [-1,1]
+\]
+\vspace{2pt}
+\begin{center}
+\begin{tabular}{lcc}
+\toprule
+Type & $r$ range & meaning \\
+\midrule
+Void      & $-1 \le r \le -0.9$   & far fewer data neighbours \\
+Sheet     & $-0.9 < r \le 0$      & mildly underdense \\
+Filament  & $0 < r \le 0.9$       & mildly overdense \\
+Knot      & $0.9 < r \le 1$       & almost all neighbours are data \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{6pt}
+Galaxies (and, independently, randoms) are then split into \textbf{quantiles} of
+$r$: Q1 = most underdense $\to$ Q4 = most overdense. Quantiles use \emph{equal
+counts}; the physical void/sheet/filament/knot classes above do not (voids and
+knots turn out to be tiny populations --- more on this later).
+\end{frame}
+
+\begin{frame}{From classification to a data vector: the ASTRA ``legs''}
+Once every data and random point has an $r$ (hence a quantile label $Q1$--$Q4$),
+we measure the redshift-space multipoles $\xi_\ell(s)$ ($\ell=0$ monopole,
+$\ell=2$ quadrupole) of every combination:
+\begin{itemize}
+\item \textbf{full sample auto} --- the plain 2PCF baseline
+\item \textbf{data quantile autos} $dQ1..dQ4$
+\item \textbf{random quantile autos} $rQ1..rQ4$ (yes --- ASTRA randoms trace the
+  same cosmic web, so their quantiles cluster too!)
+\item \textbf{full $\times$ data-quantile crosses} $xdQ1..xdQ4$
+\item \textbf{full $\times$ random-quantile crosses} $xrQ1..xrQ4$
+\end{itemize}
+That is $17$ stems $\times\,\{\ell=0,2\}\times 15$ separation bins per simulated
+box: a rich, structured data vector built entirely out of standard 2PCF
+machinery, applied per environment.
+\end{frame}
+
+\begin{frame}{Measurement pipeline}
+\begin{itemize}
+\item AbacusSummit HOD galaxy catalogs ($2\Mpch[\mathrm{Gpc}]$ boxes,
+  $\sim\!4\times10^6$ galaxies), redshift-space positions (RSD along the line of
+  sight) and Alcock--Paczynski rescaled into a common fiducial frame.
+\item \textbf{Two random catalogs, kept strictly separate:}
+  \begin{itemize}
+    \item \emph{ASTRA randoms} (1$\times$ data): enter the Delaunay tessellation,
+      get their own $r$ and quantile label, regenerated every iteration.
+    \item \emph{Geometry randoms} (5$\times$ data, fixed): the plain
+      Landy--Szalay reference, never touch the classification.
+  \end{itemize}
+\item Multipoles measured with the Landy--Szalay estimator,
+  $\hat\xi = (DD - 2DR + RR)/RR$, using \texttt{pycorr}/\texttt{Corrfunc}.
+\item Everything is repeated over several independent ASTRA-random realisations
+  and averaged, so the classification noise itself is controlled.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{What does ASTRA actually measure?}
+\centering
+\includegraphics[width=0.8\textwidth]{data_multipoles_all_quantiles.png}
+\begin{block}{Bottom line}
+\small A clean monotonic ordering Q1 $<$ Q2 $<$ Q3 $<$ Q4 in clustering amplitude ---
+knots cluster far more strongly than the general sample, voids barely at all: the
+expected cosmic-web signature, from a Delaunay triangulation and a standard 2PCF.
+\end{block}
+\end{frame}
+
+% =================================================================
+\section{Is this physical? A validation test}
+% =================================================================
+
+\begin{frame}{A sanity check: why must $\xi(s)$ cross zero?}
+\[
+\xi(r) = \frac{1}{2\pi^2}\int_0^\infty dk\,k^2 P(k)\,j_0(kr),
+\qquad
+P(k\!=\!0) = \int \xi(r)\,d^3r .
+\]
+\begin{itemize}
+\item For a primordial spectrum with $n_s>0$, $P(k\!\to\!0)\to 0$: the strong
+  small-scale positive correlation must be compensated by a shallow negative tail.
+  Every overdense region sits in a slightly underdense larger environment.
+\item The crossing scale tracks the horizon at matter--radiation equality
+  (Prada et al.\ 2011) --- a standard ruler, $s_0\approx125$--$130\Mpch$ in
+  linear theory.
+\item At leading order, bias and Kaiser RSD only \emph{rescale} $\xi$:
+  $\xi_g = b^2\xi_m$. They cannot move the zero. \textbf{Every linearly biased
+  tracer must cross zero at the same scale.}
+\end{itemize}
+\begin{alertblock}{Why this matters for ASTRA}
+If our environment-selected quantiles are behaving as genuine, linearly biased
+tracers of the same underlying field --- not noise, not an artefact of the
+classification --- they must all share this crossing.
+\end{alertblock}
+\end{frame}
+
+\begin{frame}{Validation I: the crossing is where it should be}
+\centering
+\includegraphics[width=0.75\textwidth]{subbox_full_data_autocorr.png}
+\begin{block}{Bottom line}
+\small The full-sample monopole crosses zero at $s\simeq123\Mpch$, matching the
+linear-theory equality-horizon prediction to within the expected integral-constraint
+shift of our finite subbox volume. The pipeline reproduces known physics before we
+ever split by environment.
+\end{block}
+\end{frame}
+
+\begin{frame}{Validation II: every ASTRA statistic shares the crossing}
+\begin{columns}[T]
+\column{0.48\textwidth}
+\centering
+\includegraphics[width=\textwidth]{subbox_autocorr_quantiles.png}
+\column{0.48\textwidth}
+\centering
+\includegraphics[width=\textwidth]{subbox_cross_full_quantiles.png}
+\end{columns}
+\vspace{4pt}
+\begin{block}{Bottom line}
+\small Despite wildly different amplitudes (knots cluster $\sim\!10\times$ more
+strongly than voids), \textbf{every} data and random quantile auto- and
+cross-correlation crosses zero at the same $s_0\simeq117$--$123\Mpch$ (Q1's cross
+approaches zero from below, consistent with anti-biased voids). This is a
+non-trivial, passed consistency test: ASTRA quantiles behave as genuine linearly
+biased tracers of the same cosmic density field --- real physics, not classification
+noise.
+\end{block}
+\end{frame}
+
+% =================================================================
+\section{Fisher machinery and a hard lesson}
+% =================================================================
+
+\begin{frame}{The Fisher-matrix formalism}
+For a Gaussian data vector $\boldsymbol\xi$ with covariance $\mathsf C$,
+\[
+F_{\alpha\beta} = \frac{\partial\boldsymbol\xi}{\partial\theta_\alpha}^{\!\top}
+\mathsf C^{-1}
+\frac{\partial\boldsymbol\xi}{\partial\theta_\beta},
+\qquad
+\sigma(\theta_\alpha) = \big[(F^{-1})_{\alpha\alpha}\big]^{1/2}.
+\]
+\begin{itemize}
+\item Quality is set entirely by two ingredients: the \textbf{derivatives}
+  $\partial\xi/\partial\theta$ and the \textbf{covariance} $\mathsf C$.
+\item The inverse covariance estimated from $N$ samples over $p$ bins is biased;
+  we apply the Hartlap correction $(N-p-2)/(N-1)$ throughout. This is what caps
+  how long a data vector can be for a fixed number of covariance samples --- a
+  recurring theme below.
+\item Target parameters: $\{\omega_b,\omega_{cdm},n_s,\sigma_8\}$.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{The simulation grid}
+Nine AbacusSummit boxes ($2\Mpch[\mathrm{Gpc}]$, phase \texttt{ph000}), fiducial
+plus four $\pm$ pairs of the linear derivative grid, each populated with an
+LRG-like HOD catalog ($\sim\!4\times10^6$ galaxies):
+\begin{center}
+\small
+\begin{tabular}{lll}
+\toprule
+Cosmology & Variation & HOD catalog \\
+\midrule
+\texttt{c000} & fiducial (Planck 2018) & \texttt{hod484} \\
+\texttt{c100}/\texttt{c101} & $\pm2\%$ in $\ln\omega_b$ & \texttt{hod179}/\texttt{hod152} \\
+\texttt{c102}/\texttt{c103} & $\pm3.3\%$ in $\ln\omega_{cdm}$ & \texttt{hod556}/\texttt{hod861} \\
+\texttt{c104}/\texttt{c105} & $\pm0.01$ in $n_s$ & \texttt{hod498}/\texttt{hod589} \\
+\texttt{c112}/\texttt{c113} & $\pm2\%$ in $\sigma_8$ & \texttt{hod507}/\texttt{hod483} \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{6pt}
+Cosmology derivatives come from central differences within each $\pm$ pair; the
+covariance comes from $500\Mpch$ subboxes of the fiducial box.
+\end{frame}
+
+\begin{frame}{A hard lesson: HOD contamination}
+\begin{alertblock}{The core problem}
+The available HOD catalogs are \textbf{not matched across cosmologies}: each
+cosmology carries its own random draw from the 12-parameter HOD prior. A naive
+$\pm$-pair derivative mixes the cosmology signal with a spurious galaxy--halo
+difference.
+\end{alertblock}
+\begin{itemize}
+\item Measured directly, the $\texttt{c100}-\texttt{c101}$ difference is a
+  scale-dependent $-6\%$ to $+9\%$ tilt in $\xi_0$ --- against a $\sim\!1\%$
+  physical $\omega_b$ signal.
+\item The $\sigma_8$ pair difference loses $\sim\!89\%$ of its amplitude to a
+  cancelling HOD mismatch. One-sided or naive paired derivatives are unusable
+  for $\sigma_8$.
+\end{itemize}
+\textbf{Removing this contamination is the thread connecting every method that
+follows.}
+\end{frame}
+
+\begin{frame}{Fix 1 (Tier 0): full-box, phase-matched derivatives}
+\small Differencing the \emph{whole} $2\Mpch[\mathrm{Gpc}]$ box (not noisy
+$500\Mpch$ subboxes) between the $\pm$ pair, with a noise model from the
+ASTRA-iteration scatter.
+
+\centering
+\includegraphics[width=0.52\textwidth]{fisher_fullbox_compare_summary.png}
+\begin{block}{Bottom line}
+\small For the three already-clean parameters, subbox and full-box derivatives
+agree to $\approx\!3\%$. For $\sigma_8$, removing derivative \emph{noise}
+tightens $\sigma(\ln\sigma_8)$ by $\sim\!1.8\times$ --- but this fixes noise,
+not the HOD contamination \emph{bias} above.
+\end{block}
+\end{frame}
+
+\begin{frame}{Fix 2 (Tier 1): explicit HOD-contamination subtraction}
+\small Measure $\partial\xi/\partial\theta_{\rm HOD}$ by regressing $\xi$ on 12
+standardised HOD parameters across $\sim\!50$ extra fiducial-cosmology HOD draws,
+then subtract the modelled contamination from each pair's derivative.
+
+\centering
+\includegraphics[width=0.72\textwidth]{hod_contamination_lns8.png}
+\begin{block}{Bottom line}
+\small Linear theory predicts $\partial\xi/\partial\ln\sigma_8 = 2\xi$. The raw
+derivative was only $11\%$ of that; the corrected derivative recovers $136\%$
+--- back in the right regime. The contamination (orange) rivals or exceeds the
+raw signal (black) everywhere: these derivatives were unusable before this fix.
+\end{block}
+\end{frame}
+
+\begin{frame}{Covariance: pooling across cosmologies}
+\begin{itemize}
+\item The 64 fiducial subboxes alone cap the data vector at $p<64$ bins ---
+  adding the quadrupole to the quantile vectors pushes Hartlap negative.
+\item Since the covariance varies far more slowly with cosmology than the mean
+  does, we pool mean-subtracted subboxes across all \textbf{nine} cosmologies:
+\[
+\mathsf C_{\rm sub} = \frac{1}{N-n_c}\sum_{c=1}^{9}\sum_{i=1}^{64}
+\big(\boldsymbol\xi_{ci}-\bar{\boldsymbol\xi}_c\big)
+\big(\boldsymbol\xi_{ci}-\bar{\boldsymbol\xi}_c\big)^{\!\top},
+\qquad N = 9\times64 = 576.
+\]
+\end{itemize}
+\begin{block}{Bottom line}
+With $N=576$ the Hartlap factor stays $\gtrsim\!0.75$ even at $p=144$ bins --- this
+single change is what lets the quadrupole and the random-quantile legs into the
+data vector at all.
+\end{block}
+\end{frame}
+
+% =================================================================
+\section{Headline Fisher results}
+% =================================================================
+
+\begin{frame}{Fixing the HOD exactly is optimistic}
+\footnotesize We build one Fisher over 4 cosmology $+$ 12 HOD parameters and
+marginalise the HOD under a Gaussian yuan23 prior, for the plain full-sample 2PCF
+(mono$+$quad).
+
+\centering
+\includegraphics[width=0.44\textwidth]{fisher_joint_marginalisation.png}
+\begin{block}{Bottom line}
+\footnotesize Marginalising over the 12 HOD nuisance parameters degrades every
+cosmological error --- worst for $\omega_b$ (\textbf{9.7$\times$}), mildest for
+$\omega_{cdm}$ (1.6$\times$). This is the honest starting point: exactly what a
+smarter data vector needs to claw back.
+\end{block}
+\end{frame}
+
+\begin{frame}{The HOD response is low-rank}
+\centering
+\includegraphics[width=0.52\textwidth]{fisher_joint_convergence.png}
+\begin{block}{Bottom line}
+\small Every parameter's marginalised error plateaus after $\sim\!4$ marginalised
+HOD directions and stays flat through all 12 --- the correction is robust to the
+prior tail, not an artefact of how the HOD prior was modelled.
+\end{block}
+\end{frame}
+
+\begin{frame}{The same story, in cosmological parameter space}
+\centering
+\includegraphics[height=0.65\textheight]{fisher_joint_ellipses.png}
+\begin{block}{Bottom line}
+\footnotesize Grey = HOD fixed, blue = HOD marginalised, full-sample auto alone.
+The blue ellipses are dramatically larger \emph{and} tilted differently: this is
+the ground the ASTRA environment split needs to win back.
+\end{block}
+\end{frame}
+
+\begin{frame}{Headline: ASTRA quantile splits win back the ground}
+\begin{center}
+\small
+\begin{tabular}{lccccc}
+\toprule
+Data vector ($\ell$'s) & $p$ & Hartlap & $\sigma(\omega_b)$ & $\sigma(\omega_{cdm})$ & $\sigma(n_s)$ \\
+\midrule
+full auto (mono$+$quad) & 30 & 0.95 & $2.18$ & $9.31$ & $52.3$ \\
+data Q autos (mono) & 32 & 0.94 & $1.94$ & $7.53$ & $29.9$ \\
+data Q autos (mono$+$quad) & 64 & 0.89 & $1.46$ & $5.51$ & $18.1$ \\
+\textbf{full$+$data Q (mono$+$quad)} & 80 & 0.86 & $\mathbf{1.14}$ & $\mathbf{4.47}$ & $\mathbf{15.5}$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+\small (units $10^{-4}$; HOD-marginalised, pooled 576-sample covariance)
+\vspace{6pt}
+\begin{alertblock}{Bottom line}
+Adding the ASTRA environment quantiles \emph{and} the quadrupole to the plain
+2PCF tightens every parameter by \textbf{1.9$\times$ ($\omega_b$), 2.1$\times$
+($\omega_{cdm}$), 3.4$\times$ ($n_s$)} --- \emph{after} full HOD marginalisation.
+The earlier finding that ``the quadrupole adds nothing'' was a Hartlap-budget
+artefact of the smaller 64-subbox covariance; with the pooled covariance both the
+environment split and the quadrupole are real, independent information.
+\end{alertblock}
+\end{frame}
+
+\begin{frame}{Sharpening the derivatives: a global response model}
+\small Instead of patching contamination pair-by-pair, fit \emph{one} linear
+response across $\sim\!50$ maximin HOD draws \emph{per} cosmology:
+\[
+\boldsymbol\xi(\boldsymbol\theta) \approx \boldsymbol\xi_0
++ \sum_p a_p\,\theta_{{\rm cosmo},p} + \sum_q b_q\,\theta_{{\rm HOD},q}.
+\]
+The HOD term absorbs the cross-cosmology mismatch \emph{by construction}: $a_p$
+is HOD-clean without any subtraction step, and cosmic variance cancels because
+every run shares phase \texttt{ph000}.
+\begin{center}
+\small
+\begin{tabular}{lcccc}
+\toprule
+Data vector & $\sigma(\omega_b)$ & $\sigma(\omega_{cdm})$ & $\sigma(n_s)$ & $\sigma(\sigma_8)$ \\
+\midrule
+full auto (mono$+$quad) & $2.12$ & $9.74$ & $52.6$ & $81.5$ \\
+\textbf{full$+$data$+$rand Q (mono$+$quad)} & $\mathbf{0.69}$ & $\mathbf{2.72}$ & $\mathbf{9.76}$ & $\mathbf{36.5}$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+\small (units $10^{-4}$)
+\begin{block}{Bottom line}
+Adding the \emph{random}-quantile legs on top tightens further, by
+$3$--$5\times$ over the plain 2PCF on every parameter: random quantiles respond
+to cosmology and HOD differently from the galaxies, breaking degeneracies the
+galaxy clustering alone cannot.
+\end{block}
+\end{frame}
+
+% =================================================================
+\section{Why the void-random cross carries the most information}
+% =================================================================
+
+\begin{frame}{Searching systematically for the best combination}
+\footnotesize Sweep all 16 single stems and all 120 pairs, scored by the
+HOD-marginalised figure of merit $\FoM_3 = [\det{\rm Cov}_3]^{-1/2}$.
+
+\centering
+\includegraphics[width=0.36\textwidth]{pair_gain_heatmap.png}
+\begin{block}{Bottom line}
+\footnotesize One cell dominates the entire $16\times16$ grid: \textbf{full$+xrQ4+xrQ1$}
+(full sample crossed with the knot- and void-environment \emph{randoms}) --- the
+brightest square on the map, outscoring every other combination.
+\end{block}
+\end{frame}
+
+\begin{frame}{Warning sign: is this just noise?}
+\footnotesize The naive ranking is dominated by vectors with a \textbf{random}-quantile
+leg (gains up to $55\times$) --- surprising, since random quadrupoles are known to
+be noise-limited. Test~1: subtract the derivative-noise bias
+$\mathrm{Tr}(C^{-1}\mathrm{Cov}(\delta))$ from every candidate.
+
+\centering
+\includegraphics[width=0.72\textwidth]{noise_aware_ranking.png}
+\begin{block}{Bottom line}
+\footnotesize The full auto has zero correction (a clean check); the random legs
+($\star$) deflate only $\sim\!25$--$40\%$ and \textbf{stay on top} --- their
+environment-classified \emph{monopoles} carry real signal, not noise.
+\end{block}
+\end{frame}
+
+\begin{frame}{Warning sign: is this just HOD nonlinearity?}
+\footnotesize Test~2: the global response is linear in the HOD; refit with
+quadratic HOD terms to see whether nonlinearity preferentially inflates the
+random-leg derivatives.
+
+\centering
+\includegraphics[width=0.8\textwidth]{nonlinear_response.png}
+\begin{block}{Bottom line}
+\footnotesize (a) Data legs (green) move \emph{as much or more} than random legs
+(red) when nonlinearity is added. (b) Ranking unchanged --- random legs still on
+top. Nonlinearity does not single them out either.
+\end{block}
+\end{frame}
+
+\begin{frame}{Why $xrQ4$ and $xrQ1$ are mirror images}
+\centering
+\includegraphics[height=0.62\textheight]{crosslegs_data_derivatives.png}
+\begin{block}{Bottom line}
+\footnotesize $xrQ4$ (full$\times$knot-random, left) and $xrQ1$
+(full$\times$void-random, right) are near mirror images: opposite measured signal
+($\xi_0\!=\!+0.50$ vs.\ $-0.43$ at $s\!\sim\!15\Mpch$) and opposite cosmology
+response ($\partial\xi_0/\partial\ln\omega_{cdm}\!=\!-0.60$ vs.\ $+0.48$).
+\end{block}
+\end{frame}
+
+\begin{frame}{Mirror images, anti-correlated}
+\centering
+\includegraphics[height=0.62\textheight]{crosslegs_covariance.png}
+\begin{block}{Bottom line}
+\footnotesize The full--$xrQ4$ block is positively correlated (red); the
+full--$xrQ1$ and $xrQ4$--$xrQ1$ blocks are \emph{negative} (blue). Opposite
+signal, opposite response, \emph{and} anti-correlated noise: exactly the recipe
+for strong Fisher leverage from two extra statistics.
+\end{block}
+\end{frame}
+
+\begin{frame}{The payoff, in cosmological parameter space}
+\centering
+\includegraphics[height=0.66\textheight]{fisher_compare_full_vs_5stem.png}
+\begin{block}{Bottom line}
+\footnotesize Adding \emph{only two} statistics --- the void and knot random
+crosses --- to the plain 2PCF already gives $\FoM_3=48\times$
+($\omega_b\,2.8\times$, $\omega_{cdm}\,3.6\times$, $n_s\,3.1\times$):
+\textbf{more than the entire five-stem data-quantile vector}. Ellipses are smaller
+\emph{and} rotated.
+\end{block}
+\end{frame}
+
+\begin{frame}{Assembling the full optimal vector}
+\centering
+\includegraphics[width=0.85\textwidth]{greedy_chain_all.png}
+\begin{block}{Bottom line}
+\footnotesize Greedy selection over all 16 stems picks the void/knot random
+crosses \emph{first} ($1\to48\times$); three more data legs push the 6-statistic
+vector to $\FoM_3\!\simeq\!210\times$ --- $\sigma(\omega_b)\,5.2\times$,
+$\sigma(\omega_{cdm})\,7.6\times$, $\sigma(n_s)\,4.8\times$,
+$\sigma(\sigma_8)\,2.7\times$ tighter than the plain 2PCF.
+\end{block}
+\end{frame}
+
+\begin{frame}{The forecast, side by side}
+\centering
+\includegraphics[height=0.66\textheight]{fisher_forecast_compare.png}
+\begin{block}{Bottom line}
+\footnotesize Grey = plain 2PCF, green = the conservative data-only optimal
+vector ($32\times$), blue = the all-stems ceiling led by the void/knot random
+crosses ($210\times$). Both shrink \emph{and rotate} the ellipses relative to the
+2PCF --- genuine degeneracy-breaking, not just a smaller error bar.
+\end{block}
+\end{frame}
+
+\begin{frame}{Where the gain lives: it's a small-scale phenomenon}
+\centering
+\includegraphics[width=0.58\textwidth]{scale_environment.png}
+\begin{block}{Bottom line}
+\footnotesize The $210\times$ collapses to $20.6\times$ at $s>20\Mpch$, $4.4\times$
+at $s>40\Mpch$: ASTRA splits by \emph{local density}, and at BAO/large scales every
+quantile shares the same zero crossing (recall the validation!), so splitting adds
+nothing there. \textbf{Two honest headlines:} $\sim\!1.5$--$1.9\times$ with a
+conservative $s>40\Mpch$ cut, or several-fold with a trusted small-scale model.
+\end{block}
+\end{frame}
+
+% =================================================================
+\section{Towards real cosmology}
+% =================================================================
+
+\begin{frame}{From forecast to measurement}
+The $\sim\!\!200\times$ headline needs \emph{simulation-based} small-scale
+modelling (an emulator), not perturbation theory. This path is already built and
+validated:
+\begin{itemize}
+\item A neural emulator $\mu(\boldsymbol\theta)$ trained across the AbacusSummit
+  emulator grid gives HOD-clean derivatives at fixed HOD, for free, for all 8
+  $w_0w_a$CDM$+$ parameters.
+\item Realistic covariance $C=C_{\rm CV}+C_{\rm emu}$ (cosmic variance
+  \emph{plus} emulator error), not the optimistic $C_{\rm CV}$ alone.
+\item The \textbf{curated vector} the emulator campaign settled on is exactly
+  full 2PCF $+$ the void-random cross monopole --- the same $xrQ1$ leg that led
+  the greedy chain above, now re-derived independently by the emulator pipeline.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{The void-random leg strikes again, with a realistic error budget}
+\centering
+\includegraphics[height=0.58\textheight]{emufisher_forecast.png}
+\begin{block}{Bottom line}
+\footnotesize Even with the realistic $C_{\rm CV}+C_{\rm emu}$ covariance (cosmic
+variance \emph{plus} measured emulator error) over all 8 $w_0w_a$CDM$+$
+parameters: the curated vector (2PCF $+$ void-random cross) gives FoM $14\times$;
+full ASTRA gives $150\times$ --- again far exceeding the $\times1.1$--$2.2$
+per-parameter gain, the degeneracy-breaking signature. Validated end-to-end
+against an MCMC.
+\end{block}
+\end{frame}
+
+\begin{frame}{The key strategic insight}
+\begin{alertblock}{The value-add is emulator-gated, not information-limited}
+ASTRA (and any environment or marked statistic) carries real cosmological
+information --- the Fisher gains above are real. But that information is only
+\emph{realisable in inference} once the emulator error on the environment legs
+falls below cosmic variance.
+\end{alertblock}
+\begin{itemize}
+\item This reframes the open question from \emph{``does the statistic
+  help?''} (yes, robustly, by every test in this talk) to \emph{``can we emulate
+  it accurately enough?''} --- a concrete, quantitative, and \emph{solvable}
+  target (denser cosmology coverage, the dominant lever).
+\item It is a general lesson for any simulation-based-inference programme built
+  on marked or environment-split statistics, not just ASTRA.
+\end{itemize}
+\end{frame}
+
+% =================================================================
+\section{Conclusion}
+% =================================================================
+
+\begin{frame}{Bottom line: why ASTRA has real potential for cosmology}
+\begin{enumerate}
+\item \textbf{The classification is physical, not a fitting artefact} --- every
+  ASTRA statistic obeys the same zero-crossing consistency test as the plain
+  2PCF.
+\item \textbf{The information is real and survives scrutiny} --- vindicated
+  against derivative-noise and nonlinear-HOD-response robustness checks, and
+  against a full joint cosmology$+$HOD marginalisation, not just fixed-HOD
+  optimism.
+\item \textbf{One leg does most of the work}: the full$\times$void-random cross
+  ($xrQ1$), paired with its knot mirror image ($xrQ4$), turns just \emph{two}
+  extra statistics into $\FoM_3=48\times$ --- more than an entire five-stem
+  data-quantile vector --- traced to a specific, interpretable mechanism
+  (opposite signal, opposite response, anti-correlated noise) and a specific
+  scale range ($s\lesssim40\Mpch$). It resurfaces independently as the emulator
+  campaign's own curated vector.
+\item \textbf{The path to a real measurement, not just a forecast, already
+  exists} and is validated (emulator $+$ MCMC), with a clear, quantitative
+  target for what unlocks the rest of the gain.
+\end{enumerate}
+\end{frame}
+
+\begin{frame}{Open challenges and outlook}
+\begin{itemize}
+\item $\sigma_8$ remains the laggard throughout: amplitude-like, most
+  degenerate with HOD bias, and least constrained by the current 9-cosmology
+  grid.
+\item The random-leg gains are the box-only \emph{ceiling}; in a real survey the
+  randoms trace the selection window, so the conservative data-leg vector is
+  the more directly transferable forecast until that window is
+  forward-modelled.
+\item The covariance still rests on subboxes tiling a single simulation phase;
+  an independent-phase mock suite (e.g.\ EZmocks) is the main residual
+  weakness for an honest, unbiased real measurement.
+\item Next: finish the emulator campaign (denser cosmology coverage is the
+  dominant lever), extend to $w_0,w_a$ via the quadrupole, and validate on
+  independent mocks.
+\end{itemize}
+\vspace{10pt}
+\centering
+\Large Thank you
+\end{frame}
+
+\end{document}
