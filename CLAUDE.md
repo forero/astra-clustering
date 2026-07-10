@@ -6,6 +6,114 @@ environment quantile.
 
 ---
 
+## ⚠ KNOWN BUG (found 2026-07-10, not yet fixed here): AP double-division in RSD+AP position construction
+
+**Summary**: every script in this repo that builds an RSD+AP position
+vector computes `x = X_PERP / Q_PERP`, `y = Y_PERP / Q_PERP`,
+`z = Z_RSD / Q_PAR`. This divides by `Q_PERP`/`Q_PAR` **a second time** —
+`X_PERP`/`Y_PERP`/`Z_RSD` in the HOD FITS catalogs are *already*
+AP-rescaled. The bug is a silent no-op for any cosmology with
+`Q_PAR=Q_PERP=1.0` exactly, which is why it's gone unnoticed: it only
+biases positions for genuinely non-trivial-AP cosmologies.
+
+**How this was found**: in the sibling project `voids-from-lrg-pairs`
+(`/pscratch/sd/f/forero/voids-from-lrg-pairs`, read-only w.r.t. this repo,
+so it could not fix the bug here — only in its own copy of the same
+convention), testing on `c134` (`Q_PAR=0.9529`, `Q_PERP=0.9758`, one of
+the strongest-AP boxes in the yuan23-prior HOD set) crashed a periodic
+`cKDTree` construction ("data greater than the size of the periodic box").
+Investigating why led to two verified facts:
+
+1. **`X_PAR`/`Y_PAR`/`Z_PAR` = `raw_position / Q_PAR`** and
+   **`X_PERP`/`Y_PERP`/`Z_PERP` = `raw_position / Q_PERP`**, applied
+   isotropically to all 3 axes, both already rescaled relative to the same
+   underlying raw (native-box) position. Verified exactly, not
+   approximately: `X_PAR * Q_PAR == X_PERP * Q_PERP` to float64 precision
+   on every galaxy in `c134/hod000` (both expressions recover the same raw
+   position). This is *not* documented anywhere in this repo or in the
+   HOD FITS headers (checked — no column-definition comments in the
+   header) and was reverse-engineered purely from the data.
+2. **`X_RSD`/`Y_RSD`/`Z_RSD` live in the same (`Q_PAR`-scaled) frame as
+   `X_PAR`/`Y_PAR`/`Z_PAR`**, not a separately-AP-rescaled frame: bulk
+   `X_RSD - X_PAR` on `c134` (excluding the ~0.16% of galaxies affected by
+   periodic-wrap edge cases) has mean≈0, std≈5 Mpc/h — the scale of a
+   genuine peculiar velocity, not a systematic rescale. So `Z_RSD` is
+   `raw_z/Q_PAR` plus a small velocity kick — already the fully
+   AP-rescaled, RSD-perturbed line-of-sight position.
+
+Given both facts, `X_PERP`/`Y_PERP`/`Z_RSD` (used directly, **no further
+division**) is the correct `los=z` RSD+AP position vector. Dividing by
+`Q_PERP`/`Q_PAR` again (as every script below currently does)
+double-applies the AP rescaling.
+
+**Affected scripts** (all construct RSD+AP positions the same way — grep
+for `X_PERP.*q_perp` or `/ q_perp` to find every instance):
+`pipeline_single_box.py`, `pipeline_fullbox_cosmo.py`,
+`pipeline_fullbox_classprob.py`, `pipeline_fullbox_weighted.py`,
+`pipeline_subboxes.py`, `pipeline_subboxes_cosmo.py`,
+`weighted_subbox_cov.py` — and very likely others downstream that consume
+positions built by these (not individually re-checked).
+
+**Confirmed-affected existing results** (checked 2026-07-10 from
+`voids-from-lrg-pairs`, by cross-referencing every `(cosmo, hod)` directory
+under `data/`/`plots/` against that cosmology's `Q_PAR`/`Q_PERP` in its HOD
+FITS header): of the 9 single-cosmology `fullbox`/`fullbox_weighted` runs,
+5 are exactly `Q=1` and unaffected (`c000_hod484`, `c104_hod498`,
+`c105_hod589`, `c112_hod507`, `c113_hod483`), but **4 are not**:
+
+| run | Q_PAR | Q_PERP |
+|---|---|---|
+| `c100_hod179` | 1.001923 | 1.000965 |
+| `c101_hod152` | 0.998106 | 0.999048 |
+| `c102_hod556` | 0.984987 | 0.992400 |
+| `c103_hod861` | 1.014603 | 1.007285 |
+
+Small deviations (0.1-1.5%) but real, systematic, and double-counted.
+
+**More consequential and NOT yet checked in detail**: this repo's own
+52-cosmology tier-3 Fisher/emulator campaign (`select_tier3_full.py`,
+spanning `c130`-`c181`, feeding `data/derivatives/` and
+`data/emulator_tier3/` — i.e. the cosmological-parameter Fisher-forecast
+and emulator work) very likely touches several *strongly* non-trivial-AP
+cosmologies: `voids-from-lrg-pairs`' own 52-cosmology survey found
+`c134` (`Q_PAR=0.953`, `Q_PERP=0.976`, 5-7% deviation), `c131`, `c143`,
+`c137`, `c141`, `c138`, `c140`, `c145` (2-7% deviation each) all fall
+inside that `c130`-`c181` range. **Whoever picks this up should**: (1)
+check which specific `derivative_*.npz`/`emulator_tier3` outputs actually
+used the RSD+AP position path (vs. a real-space-only or other convention,
+which would be unaffected) and which cosmologies they draw from; (2) if
+affected, decide whether to fix-and-rerun or quantify the bias size first
+(since Fisher derivatives w.r.t. cosmological parameters are computed by
+finite-differencing across the cosmology grid, a systematic per-cosmology
+position bias could plausibly bias the derivative estimates themselves,
+not just add noise).
+
+**The fix** (already applied and verified in `voids-from-lrg-pairs`'
+`scripts/find_isolated_pairs_hod_rsd.py`, safe to copy the pattern):
+remove the redundant division —
+```python
+# before (double-divides):
+x = data['X_PERP'] / q_perp
+y = data['Y_PERP'] / q_perp
+z = data['Z_RSD']  / q_par
+# after (X_PERP/Y_PERP/Z_RSD are already AP-rescaled):
+x = data['X_PERP']
+y = data['Y_PERP']
+z = data['Z_RSD']
+```
+Also check any place downstream that assumes the periodic box is exactly
+`FULL_SIZE` (e.g. `pipeline_subboxes_cosmo.py`'s box-edge comment,
+`±(FULL_SIZE/2)/q` — that box-size *formula* is actually already correct
+for the **fixed** position construction above, since `X_PERP` alone spans
+`±(FULL_SIZE/2)/Q_PERP`; it's only the *position* construction that was
+double-dividing, not the box-size bookkeeping). **Before trusting this
+fix**, regression-check any already-completed `Q≈1` result stays
+bit-identical after the change (that's how `voids-from-lrg-pairs` verified
+it didn't silently break anything else: reran `c000/hod000`, diffed
+against the pre-fix cached output, confirmed exact match).
+
+---
+
 ## What is ASTRA?
 
 ASTRA classifies each galaxy by its local density environment using a
